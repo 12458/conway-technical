@@ -21,6 +21,47 @@ MAX_ACTORS = 50_000
 MAX_REPOS = 25_000
 MAX_TEXT_BYTES = 2048  # 2KB text limit
 
+# Known bot accounts to filter out
+KNOWN_BOTS = {
+    "github-actions[bot]",
+    "dependabot[bot]",
+    "coderabbitai[bot]",
+    "socket-security[bot]",
+    "renovate[bot]",
+    "greenkeeper[bot]",
+    "codecov[bot]",
+    "codecov-io",
+    "codecov-commenter",
+    "imgbot[bot]",
+    "snyk-bot",
+    "sonarcloud[bot]",
+    "renovate-bot",
+    "pyup-bot",
+    "mergify[bot]",
+    "restyled-io[bot]",
+    "vercel[bot]",
+    "netlify[bot]",
+    "github-advanced-security[bot]",
+    "microsoft-github-policy-service[bot]",
+    "allcontributors[bot]",
+    "semantic-release-bot",
+    "gitpod-io[bot]",
+    "codesandbox[bot]",
+    "pre-commit-ci[bot]",
+    "stale[bot]",
+    "fossabot",
+    "coveralls",
+    "lgtm-com[bot]",
+    "dependabot-preview[bot]",
+    "whitesource-bolt-for-github[bot]",
+    "sourcery-ai[bot]",
+    "deepsource-autofix[bot]",
+    "sweep-ai[bot]",
+    "linear[bot]",
+    "gitguardian[bot]",
+    "copilot[bot]",
+}
+
 
 class GitHubFeatureExtractor:
     """Extract RRCF-optimized numerical features from GitHub events.
@@ -40,6 +81,7 @@ class GitHubFeatureExtractor:
         normalize: bool = True,
         ngram_size: int = 4,
         normalization_frequency: int = 10,
+        filter_bots: bool = True,
     ):
         """Initialize the feature extractor with RRCF-optimized settings.
 
@@ -55,6 +97,7 @@ class GitHubFeatureExtractor:
             normalize: Enable z-score normalization using running mean/std
             ngram_size: Character n-gram size for text hashing (default: 4)
             normalization_frequency: Update Welford stats every N events (default: 10)
+            filter_bots: Filter out known bot accounts (default: True)
         """
         # Hash dimensions (reduced by 50% for performance)
         self.categorical_dims = categorical_dims or {
@@ -79,6 +122,9 @@ class GitHubFeatureExtractor:
         self.normalize = normalize
         self.ngram_size = ngram_size
         self.normalization_frequency = normalization_frequency
+
+        # Bot filtering
+        self.filter_bots = filter_bots
 
         # LRU-bounded tracking with lazy decay (OrderedDict for LRU)
         self.actor_event_counts = OrderedDict()  # actor -> raw count
@@ -128,6 +174,17 @@ class GitHubFeatureExtractor:
             del self.repo_event_counts[oldest_repo]
             self.repo_last_seen.pop(oldest_repo, None)
             self.repo_actors.pop(oldest_repo, None)
+
+    def is_bot(self, actor_login: str) -> bool:
+        """Check if an actor is a known bot.
+
+        Args:
+            actor_login: Actor username to check
+
+        Returns:
+            True if actor is in KNOWN_BOTS set
+        """
+        return actor_login in KNOWN_BOTS
 
     def _hash_categorical(self, value: str, dim: int, seed: int = 0) -> np.ndarray:
         """Hash a categorical value into a fixed-dimension one-hot vector.
@@ -228,7 +285,7 @@ class GitHubFeatureExtractor:
 
         return (features - self.feature_mean) / std
 
-    def extract_features(self, event: Event) -> np.ndarray:
+    def extract_features(self, event: Event) -> np.ndarray | None:
         """Extract RRCF-optimized feature vector from a GitHub event.
 
         Features (fixed length ~275):
@@ -245,14 +302,20 @@ class GitHubFeatureExtractor:
             event: GitHub Event object from models.py
 
         Returns:
-            Numpy array of numerical features (z-scored if normalize=True)
+            Numpy array of numerical features (z-scored if normalize=True),
+            or None if event is from a bot and filter_bots=True
         """
+        actor_login = event.actor.login
+
+        # Filter bots if enabled
+        if self.filter_bots and self.is_bot(actor_login):
+            return None
+
         # Increment event counter for lazy decay
         self.total_events += 1
 
         # Preallocate feature array (4 + 32 + 64 + 3 + 64 + 2 + 32 + 170 = ~371)
         # Actual size varies by event type, but we'll build and trim
-        actor_login = event.actor.login
         repo_name = event.repo.name
 
         # Calculate feature dimensions
