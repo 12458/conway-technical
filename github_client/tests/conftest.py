@@ -97,3 +97,298 @@ def mock_etag():
 def mock_poll_interval():
     """Sample poll interval for testing."""
     return 60
+
+
+# New fixtures for nested models
+
+
+@pytest.fixture
+def sample_organization_data():
+    """Sample organization data for testing."""
+    return {
+        "id": 1,
+        "login": "github",
+        "gravatar_id": "",
+        "url": "https://api.github.com/orgs/github",
+        "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+    }
+
+
+@pytest.fixture
+def sample_user_data():
+    """Sample user data for testing."""
+    return {
+        "id": 1,
+        "login": "octocat",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/octocat",
+        "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+        "type": "User",
+    }
+
+
+@pytest.fixture
+def sample_label_data():
+    """Sample label data for testing."""
+    return {
+        "id": 208045946,
+        "name": "bug",
+        "color": "d73a4a",
+        "url": "https://api.github.com/repos/octocat/Hello-World/labels/bug",
+        "default": True,
+    }
+
+
+@pytest.fixture
+def sample_issue_data(sample_user_data, sample_label_data):
+    """Sample issue data for testing."""
+    return {
+        "id": 1,
+        "number": 1347,
+        "title": "Found a bug",
+        "state": "open",
+        "body": "I'm having a problem with this.",
+        "user": sample_user_data,
+        "labels": [sample_label_data],
+        "assignee": sample_user_data,
+        "assignees": [sample_user_data],
+        "url": "https://api.github.com/repos/octocat/Hello-World/issues/1347",
+        "html_url": "https://github.com/octocat/Hello-World/issues/1347",
+        "created_at": "2022-06-09T12:00:00Z",
+        "updated_at": "2022-06-09T13:00:00Z",
+        "closed_at": None,
+    }
+
+
+@pytest.fixture
+def sample_comment_data(sample_user_data):
+    """Sample comment data for testing."""
+    return {
+        "id": 1,
+        "body": "This is a comment",
+        "user": sample_user_data,
+        "url": "https://api.github.com/repos/octocat/Hello-World/issues/comments/1",
+        "html_url": "https://github.com/octocat/Hello-World/issues/1347#issuecomment-1",
+        "created_at": "2022-06-09T12:30:00Z",
+        "updated_at": "2022-06-09T12:30:00Z",
+    }
+
+
+@pytest.fixture
+def sample_commit_comment_data(sample_user_data):
+    """Sample commit comment data for testing."""
+    return {
+        "id": 1,
+        "body": "Great commit!",
+        "user": sample_user_data,
+        "commit_id": "7a8f3ac80e2ad2f6842cb86f576d4bfe2c03e300",
+        "path": "file.py",
+        "position": 1,
+        "line": 10,
+        "url": "https://api.github.com/repos/octocat/Hello-World/comments/1",
+        "html_url": "https://github.com/octocat/Hello-World/commit/7a8f3ac#commitcomment-1",
+        "created_at": "2022-06-09T12:30:00Z",
+        "updated_at": "2022-06-09T12:30:00Z",
+    }
+
+
+@pytest.fixture
+def sample_pull_request_data(sample_user_data, sample_label_data):
+    """Sample pull request data for testing."""
+    return {
+        "id": 1,
+        "number": 42,
+        "title": "Amazing new feature",
+        "state": "open",
+        "body": "Please merge this",
+        "user": sample_user_data,
+        "labels": [sample_label_data],
+        "assignee": sample_user_data,
+        "assignees": [sample_user_data],
+        "merged": False,
+        "url": "https://api.github.com/repos/octocat/Hello-World/pulls/42",
+        "html_url": "https://github.com/octocat/Hello-World/pull/42",
+        "created_at": "2022-06-09T12:00:00Z",
+        "updated_at": "2022-06-09T13:00:00Z",
+        "closed_at": None,
+        "merged_at": None,
+    }
+
+
+@pytest.fixture
+def sample_review_data(sample_user_data):
+    """Sample PR review data for testing."""
+    return {
+        "id": 1,
+        "body": "Looks good to me",
+        "user": sample_user_data,
+        "state": "APPROVED",
+        "commit_id": "7a8f3ac80e2ad2f6842cb86f576d4bfe2c03e300",
+        "url": "https://api.github.com/repos/octocat/Hello-World/pulls/42/reviews/1",
+        "html_url": "https://github.com/octocat/Hello-World/pull/42#pullrequestreview-1",
+        "submitted_at": "2022-06-09T14:00:00Z",
+    }
+
+
+@pytest.fixture
+def sample_repository_data(sample_user_data):
+    """Sample detailed repository data for testing."""
+    return {
+        "id": 1296269,
+        "name": "Hello-World",
+        "full_name": "octocat/Hello-World",
+        "owner": sample_user_data,
+        "private": False,
+        "description": "My first repository",
+        "fork": False,
+        "url": "https://api.github.com/repos/octocat/Hello-World",
+        "html_url": "https://github.com/octocat/Hello-World",
+        "created_at": "2022-01-01T00:00:00Z",
+        "updated_at": "2022-06-09T12:00:00Z",
+        "pushed_at": "2022-06-09T11:00:00Z",
+        "default_branch": "main",
+    }
+
+
+@pytest.fixture
+def sample_release_data(sample_user_data):
+    """Sample release data for testing."""
+    return {
+        "id": 1,
+        "tag_name": "v1.0.0",
+        "name": "Production Release",
+        "body": "Description of the release",
+        "draft": False,
+        "prerelease": False,
+        "author": sample_user_data,
+        "url": "https://api.github.com/repos/octocat/Hello-World/releases/1",
+        "html_url": "https://github.com/octocat/Hello-World/releases/tag/v1.0.0",
+        "created_at": "2022-06-09T10:00:00Z",
+        "published_at": "2022-06-09T12:00:00Z",
+    }
+
+
+@pytest.fixture
+def sample_discussion_data(sample_user_data):
+    """Sample discussion data for testing."""
+    return {
+        "id": 1,
+        "number": 1,
+        "title": "How do I do X?",
+        "body": "I need help with X",
+        "user": sample_user_data,
+        "state": "open",
+        "url": "https://api.github.com/repos/octocat/Hello-World/discussions/1",
+        "html_url": "https://github.com/octocat/Hello-World/discussions/1",
+        "created_at": "2022-06-09T12:00:00Z",
+        "updated_at": "2022-06-09T12:30:00Z",
+    }
+
+
+@pytest.fixture
+def sample_wiki_page_data():
+    """Sample wiki page data for testing."""
+    return {
+        "page_name": "Home",
+        "title": "Home Page",
+        "summary": "Updated home page",
+        "action": "edited",
+        "sha": "7a8f3ac80e2ad2f6842cb86f576d4bfe2c03e300",
+        "html_url": "https://github.com/octocat/Hello-World/wiki/Home",
+    }
+
+
+@pytest.fixture
+def sample_commit_data():
+    """Sample commit data for testing."""
+    return {
+        "sha": "7a8f3ac80e2ad2f6842cb86f576d4bfe2c03e300",
+        "message": "Fix bug",
+        "author": {
+            "name": "Octocat",
+            "email": "octocat@github.com",
+        },
+        "url": "https://api.github.com/repos/octocat/Hello-World/commits/7a8f3ac",
+        "distinct": True,
+    }
+
+
+# New event fixtures
+
+
+@pytest.fixture
+def sample_commit_comment_event_data(
+    sample_actor_data, sample_repo_data, sample_commit_comment_data
+):
+    """Sample CommitCommentEvent data for testing."""
+    return {
+        "id": "22249084970",
+        "type": "CommitCommentEvent",
+        "actor": sample_actor_data,
+        "repo": sample_repo_data,
+        "payload": {
+            "action": "created",
+            "comment": sample_commit_comment_data,
+        },
+        "public": True,
+        "created_at": "2022-06-09T14:00:00Z",
+    }
+
+
+@pytest.fixture
+def sample_discussion_event_data(
+    sample_actor_data, sample_repo_data, sample_discussion_data
+):
+    """Sample DiscussionEvent data for testing."""
+    return {
+        "id": "22249084971",
+        "type": "DiscussionEvent",
+        "actor": sample_actor_data,
+        "repo": sample_repo_data,
+        "payload": {
+            "action": "created",
+            "discussion": sample_discussion_data,
+        },
+        "public": True,
+        "created_at": "2022-06-09T15:00:00Z",
+    }
+
+
+@pytest.fixture
+def sample_pull_request_review_event_data(
+    sample_actor_data, sample_repo_data, sample_pull_request_data, sample_review_data
+):
+    """Sample PullRequestReviewEvent data for testing."""
+    return {
+        "id": "22249084972",
+        "type": "PullRequestReviewEvent",
+        "actor": sample_actor_data,
+        "repo": sample_repo_data,
+        "payload": {
+            "action": "created",
+            "pull_request": sample_pull_request_data,
+            "review": sample_review_data,
+        },
+        "public": True,
+        "created_at": "2022-06-09T16:00:00Z",
+    }
+
+
+@pytest.fixture
+def sample_pull_request_review_comment_event_data(
+    sample_actor_data, sample_repo_data, sample_pull_request_data, sample_comment_data
+):
+    """Sample PullRequestReviewCommentEvent data for testing."""
+    return {
+        "id": "22249084973",
+        "type": "PullRequestReviewCommentEvent",
+        "actor": sample_actor_data,
+        "repo": sample_repo_data,
+        "payload": {
+            "action": "created",
+            "pull_request": sample_pull_request_data,
+            "comment": sample_comment_data,
+        },
+        "public": True,
+        "created_at": "2022-06-09T17:00:00Z",
+    }
