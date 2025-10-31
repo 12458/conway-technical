@@ -35,6 +35,17 @@ class Settings(BaseSettings):
         description="HTTP request timeout in seconds",
     )
 
+    # GH Archive settings
+    gharchive_data_dir: str = Field(
+        default="./data/gharchive",
+        description="Directory containing GH Archive data files",
+    )
+
+    gharchive_strict_mode: bool = Field(
+        default=False,
+        description="If True, raise exceptions on validation errors. If False, skip invalid events.",
+    )
+
 
 # Global settings instance
 settings = Settings()

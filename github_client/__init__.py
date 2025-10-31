@@ -12,6 +12,7 @@ from .exceptions import (
     ServiceUnavailableError,
     ValidationError,
 )
+from .gharchive import GHArchiveLoader, LoaderStats
 from .models import (
     Actor,
     Commit,
@@ -61,6 +62,9 @@ __all__ = [
     "ForbiddenError",
     "ServiceUnavailableError",
     "ValidationError",
+    # GH Archive
+    "GHArchiveLoader",
+    "LoaderStats",
     # Base Models
     "Actor",
     "Repo",

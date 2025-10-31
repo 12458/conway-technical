@@ -1,6 +1,7 @@
 """Pytest fixtures for github_client tests."""
 
-from datetime import datetime, timezone
+import gzip
+import json
 
 import pytest
 
@@ -392,3 +393,101 @@ def sample_pull_request_review_comment_event_data(
         "public": True,
         "created_at": "2022-06-09T17:00:00Z",
     }
+
+
+# GH Archive fixtures
+
+
+@pytest.fixture
+def sample_gharchive_file(
+    tmp_path,
+    sample_watch_event_data,
+    sample_push_event_data,
+    sample_create_event_data,
+):
+    """Create a sample GH Archive .json.gz file for testing.
+
+    This fixture creates a temporary GH Archive file containing multiple
+    valid event records in NDJSON format.
+    """
+    archive_file = tmp_path / "2015-01-01-15.json.gz"
+
+    events = [
+        sample_watch_event_data,
+        sample_push_event_data,
+        sample_create_event_data,
+    ]
+
+    with gzip.open(archive_file, "wt", encoding="utf-8") as f:
+        for event in events:
+            f.write(json.dumps(event) + "\n")
+
+    return archive_file
+
+
+@pytest.fixture
+def sample_gharchive_file_with_invalid_events(
+    tmp_path, sample_watch_event_data
+):
+    """Create a GH Archive file with both valid and invalid events.
+
+    This fixture creates a file containing:
+    - Valid events
+    - Events with missing required fields
+    - Events with invalid data types
+    """
+    archive_file = tmp_path / "mixed_validity.json.gz"
+
+    # Valid event
+    valid_event = sample_watch_event_data
+
+    # Invalid event - missing required 'actor' field
+    invalid_event_1 = {
+        "id": "22249084948",
+        "type": "WatchEvent",
+        "repo": {
+            "id": 1296269,
+            "name": "octocat/Hello-World",
+            "url": "https://api.github.com/repos/octocat/Hello-World",
+        },
+        "payload": {"action": "started"},
+        "public": True,
+        "created_at": "2022-06-09T12:47:28Z",
+    }
+
+    # Invalid event - wrong data type for 'id'
+    invalid_event_2 = {
+        "id": 12345,  # Should be string
+        "type": "WatchEvent",
+        "actor": sample_watch_event_data["actor"],
+        "repo": sample_watch_event_data["repo"],
+        "payload": {"action": "started"},
+        "public": True,
+        "created_at": "2022-06-09T12:47:28Z",
+    }
+
+    events = [valid_event, invalid_event_1, invalid_event_2]
+
+    with gzip.open(archive_file, "wt", encoding="utf-8") as f:
+        for event in events:
+            f.write(json.dumps(event) + "\n")
+
+    return archive_file
+
+
+@pytest.fixture
+def sample_large_gharchive_file(tmp_path, sample_watch_event_data):
+    """Create a larger GH Archive file for testing iteration and limits.
+
+    This fixture creates a file with 100 events for testing pagination,
+    limits, and performance.
+    """
+    archive_file = tmp_path / "large_archive.json.gz"
+
+    with gzip.open(archive_file, "wt", encoding="utf-8") as f:
+        for i in range(100):
+            event = sample_watch_event_data.copy()
+            event["id"] = f"event_{i}"
+            f.write(json.dumps(event) + "\n")
+
+    return archive_file
