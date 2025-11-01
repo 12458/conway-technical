@@ -213,7 +213,6 @@ Event Type: {event_type}
 Actor: {actor_login}
 Repository: {repo_name}
 Timestamp: {event_data['created_at']}
-Anomaly Score: {anomaly_score:.2f} (threshold: {service_settings.anomaly_threshold})
 
 Suspicious Patterns Detected:
 {chr(10).join(f"- {pattern}" for pattern in suspicious_patterns) if suspicious_patterns else "- None"}
