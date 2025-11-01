@@ -157,7 +157,11 @@ class AnomalySummary(Base):
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for API response."""
+        """Convert to dictionary for API response.
+
+        Note: This method is kept for backward compatibility.
+        For typed responses, use to_response() instead.
+        """
         return {
             "id": self.id,
             "event_id": self.event_id,
@@ -176,6 +180,33 @@ class AnomalySummary(Base):
             "created_at": self.created_at.isoformat(),
             "tags": self.tags,
         }
+
+    def to_response(self) -> "AnomalySummaryResponse":
+        """Convert to strongly-typed Pydantic response model.
+
+        Returns:
+            AnomalySummaryResponse with full validation and type safety
+        """
+        from service.sse_models import AnomalySummaryResponse
+
+        return AnomalySummaryResponse(
+            id=self.id,
+            event_id=self.event_id,
+            title=self.title,
+            severity=self.severity,  # type: ignore - validated at runtime
+            root_cause=self.root_cause,
+            impact=self.impact,
+            next_steps=self.next_steps,
+            suspicious_patterns=self.suspicious_patterns,
+            anomaly_score=self.anomaly_score,
+            event_type=self.event_type,
+            actor_login=self.actor_login,
+            repo_name=self.repo_name,
+            raw_event=self.raw_event,
+            event_timestamp=self.event_timestamp,
+            created_at=self.created_at,
+            tags=self.tags,
+        )
 
 
 # Database engine and session

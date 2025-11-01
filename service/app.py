@@ -16,6 +16,7 @@ from service.anomaly_detector import detector
 from service.database import AnomalySummary, AsyncSessionLocal, init_db
 from service.poller import poller
 from service.queue import get_queue_stats
+from service.sse_models import AnomalyMessage, ConnectedMessage
 
 # Configure logging
 logging.basicConfig(
@@ -205,8 +206,9 @@ async def stream_summaries():
         queue = await broadcaster.connect()
 
         try:
-            # Send initial connection message
-            yield f"data: {json.dumps({'type': 'connected', 'message': 'Stream connected'})}\n\n"
+            # Send initial connection message (strongly typed)
+            connected_msg = ConnectedMessage()
+            yield f"data: {connected_msg.model_dump_json()}\n\n"
 
             # Stream messages
             while True:
@@ -302,12 +304,10 @@ async def _summary_broadcaster():
                 )
                 new_summaries = result.scalars().all()
 
-                # Broadcast each new summary
+                # Broadcast each new summary (strongly typed)
                 for summary in new_summaries:
-                    message = {
-                        "type": "anomaly",
-                        "data": summary.to_dict(),
-                    }
+                    anomaly_msg = AnomalyMessage(data=summary.to_response())
+                    message = anomaly_msg.model_dump(mode="json")
                     await broadcaster.broadcast(message)
                     last_id = summary.id
                     logger.info(f"Broadcasted summary {summary.id} to SSE clients")
