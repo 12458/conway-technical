@@ -196,9 +196,9 @@ class GitHubFeatureExtractor:
             actor_login: Actor username to check
 
         Returns:
-            True if actor is in KNOWN_BOTS set
+            True if actor is in KNOWN_BOTS set or has '[bot]' in name
         """
-        return actor_login in KNOWN_BOTS
+        return actor_login in KNOWN_BOTS or "[bot]" in actor_login.lower()
 
     def _hash_categorical(self, value: str, dim: int, seed: int = 0) -> np.ndarray:
         """Hash a categorical value into a fixed-dimension one-hot vector.

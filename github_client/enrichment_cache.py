@@ -227,6 +227,8 @@ class CommitVerificationCache(Base):
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     author_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     author_email: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    commit_entropy: Mapped[float | None] = mapped_column(Float, nullable=True)
+    commit_size: Mapped[int] = mapped_column(Integer, default=0)
 
     # Cache metadata (commits are immutable, so cache never expires)
     cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
@@ -245,6 +247,8 @@ class CommitVerificationCache(Base):
             message=self.message,
             author_name=self.author_name,
             author_email=self.author_email,
+            commit_entropy=self.commit_entropy,
+            commit_size=self.commit_size,
             cached_at=self.cached_at,
         )
 
@@ -263,6 +267,8 @@ class CommitVerificationCache(Base):
             message=verification.message,
             author_name=verification.author_name,
             author_email=verification.author_email,
+            commit_entropy=verification.commit_entropy,
+            commit_size=verification.commit_size,
             cached_at=verification.cached_at,
         )
 

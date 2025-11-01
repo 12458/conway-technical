@@ -2,9 +2,12 @@
 
 import asyncio
 import logging
+import math
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
+import aiohttp
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.exceptions import TransportQueryError
@@ -17,6 +20,36 @@ from github_client.enriched_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def calculate_shannon_entropy(text: str) -> float:
+    """Calculate Shannon entropy of a text string.
+
+    Shannon entropy measures the randomness/information content in data.
+    Higher entropy indicates more randomness, which can indicate obfuscated
+    or encrypted code. Normal code typically has entropy around 4-6, while
+    obfuscated/minified code often has entropy >7.
+
+    Args:
+        text: Text to analyze (e.g., commit diff content)
+
+    Returns:
+        Entropy value (typically 0-8 for text, higher = more random)
+    """
+    if not text:
+        return 0.0
+
+    # Count character frequencies
+    char_counts = Counter(text)
+    total_chars = len(text)
+
+    # Calculate entropy: -Σ(p(x) * log2(p(x)))
+    entropy = 0.0
+    for count in char_counts.values():
+        probability = count / total_chars
+        entropy -= probability * math.log2(probability)
+
+    return entropy
 
 
 class GitHubGraphQLClient:
@@ -394,6 +427,50 @@ class GitHubGraphQLClient:
             overall_conclusion=overall,
         )
 
+    async def _fetch_commit_patch_rest(
+        self, owner: str, name: str, sha: str
+    ) -> str | None:
+        """Fetch commit patch/diff via REST API for entropy calculation.
+
+        Args:
+            owner: Repository owner
+            name: Repository name
+            sha: Commit SHA
+
+        Returns:
+            Patch/diff content as string, or None on error
+        """
+        url = f"https://api.github.com/repos/{owner}/{name}/commits/{sha}"
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Accept": "application/vnd.github.v3.diff",  # Request diff format
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    if response.status == 200:
+                        patch_content = await response.text()
+                        # Limit patch size to avoid memory issues (max 1MB)
+                        if len(patch_content) > 1_000_000:
+                            logger.warning(
+                                f"Patch too large ({len(patch_content)} bytes), "
+                                f"truncating for entropy calculation"
+                            )
+                            patch_content = patch_content[:1_000_000]
+                        return patch_content
+                    else:
+                        logger.warning(
+                            f"Failed to fetch commit patch: HTTP {response.status}"
+                        )
+                        return None
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout fetching commit patch for {owner}/{name}@{sha}")
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching commit patch: {e}")
+            return None
+
     async def get_commit_verification(
         self, owner: str, name: str, sha: str
     ) -> CommitVerification | None:
@@ -462,14 +539,31 @@ class GitHubGraphQLClient:
         if signature and signature.get("signer"):
             signer_login = signature["signer"].get("login")
 
+        # Calculate commit size
+        additions = commit_obj.get("additions", 0)
+        deletions = commit_obj.get("deletions", 0)
+        commit_size = additions + deletions
+
+        # Fetch commit patch and calculate entropy
+        commit_entropy = None
+        try:
+            patch_content = await self._fetch_commit_patch_rest(owner, name, sha)
+            if patch_content:
+                commit_entropy = calculate_shannon_entropy(patch_content)
+                logger.debug(
+                    f"Calculated entropy {commit_entropy:.2f} for commit {sha[:8]}"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to calculate entropy for {sha}: {e}")
+
         return CommitVerification(
             repository=f"{owner}/{name}",
             sha=sha,
             is_signed=is_signed,
             signer_login=signer_login,
             signature_valid=signature_valid,
-            additions=commit_obj.get("additions", 0),
-            deletions=commit_obj.get("deletions", 0),
+            additions=additions,
+            deletions=deletions,
             changed_files=commit_obj.get("changedFiles", 0),
             message=commit_obj.get("message"),
             author_name=(
@@ -478,6 +572,8 @@ class GitHubGraphQLClient:
             author_email=(
                 commit_obj["author"].get("email") if commit_obj.get("author") else None
             ),
+            commit_entropy=commit_entropy,
+            commit_size=commit_size,
         )
 
     async def batch_query(

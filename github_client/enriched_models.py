@@ -142,6 +142,12 @@ class CommitVerification(BaseModel):
     message: str | None = Field(None, description="Commit message")
     author_name: str | None = Field(None, description="Commit author name")
     author_email: str | None = Field(None, description="Commit author email")
+    commit_entropy: float | None = Field(
+        None, description="Shannon entropy of commit changes (helps detect obfuscated code)"
+    )
+    commit_size: int = Field(
+        description="Total size of commit in lines changed (additions + deletions)"
+    )
     cached_at: datetime = Field(
         default_factory=datetime.utcnow, description="When this data was cached"
     )
@@ -160,6 +166,25 @@ class CommitVerification(BaseModel):
     def is_verified(self) -> bool:
         """Whether commit is signed and signature is valid."""
         return self.is_signed and self.signature_valid
+
+    @property
+    def has_high_entropy(self) -> bool:
+        """Whether commit has suspiciously high entropy (>7.0), indicating potential obfuscation."""
+        return self.commit_entropy is not None and self.commit_entropy > 7.0
+
+    @property
+    def entropy_level(self) -> str:
+        """Human-readable entropy level classification."""
+        if self.commit_entropy is None:
+            return "Unknown"
+        elif self.commit_entropy < 4.0:
+            return "Low"
+        elif self.commit_entropy < 6.0:
+            return "Normal"
+        elif self.commit_entropy < 7.0:
+            return "Elevated"
+        else:
+            return "High (Suspicious)"
 
 
 class EnrichedEvent(BaseModel):
