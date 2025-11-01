@@ -170,9 +170,10 @@ class GitHubEventsPoller:
                         )
 
                         # Enqueue job for AI summarization
+                        # Use to_event_dict() to get Event-compatible format for enrichment
                         enqueue_anomaly_summarization(
                             event_id=event.id,
-                            event_data=db_event.to_dict(),
+                            event_data=db_event.to_event_dict(),
                             anomaly_score=float(score),
                             suspicious_patterns=patterns,
                         )

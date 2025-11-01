@@ -67,6 +67,55 @@ class GitHubEvent(Base):
             "anomaly_score": self.anomaly_score,
         }
 
+    def to_event_dict(self) -> dict[str, Any]:
+        """Convert to Event model dictionary format.
+
+        Reconstructs the original Event structure from flattened database fields.
+        """
+        # Build actor object
+        actor_data = {
+            "id": self.actor_id,
+            "login": self.actor_login,
+            "display_login": self.actor_login,
+            "gravatar_id": "",
+            "url": f"https://api.github.com/users/{self.actor_login}",
+            "avatar_url": f"https://avatars.githubusercontent.com/u/{self.actor_id}",
+        }
+
+        # Build repo object
+        repo_data = {
+            "id": self.repo_id,
+            "name": self.repo_name,
+            "url": f"https://api.github.com/repos/{self.repo_name}",
+        }
+
+        # Build org object if present
+        org_data = None
+        if self.org_login:
+            org_data = {
+                "id": 0,  # We don't store org_id, use placeholder
+                "login": self.org_login,
+                "gravatar_id": "",
+                "url": f"https://api.github.com/orgs/{self.org_login}",
+                "avatar_url": f"https://avatars.githubusercontent.com/u/0",
+            }
+
+        # Build Event dictionary
+        event_dict = {
+            "id": self.id,
+            "type": self.event_type,
+            "actor": actor_data,
+            "repo": repo_data,
+            "payload": self.payload,
+            "public": True,  # Assume public since we only track public events
+            "created_at": self.created_at.isoformat() if hasattr(self.created_at, 'isoformat') else self.created_at,
+        }
+
+        if org_data:
+            event_dict["org"] = org_data
+
+        return event_dict
+
 
 class AnomalySummary(Base):
     """Stores AI-generated summaries for detected anomalies."""
@@ -145,6 +194,17 @@ AsyncSessionLocal = async_sessionmaker(
 
 async def init_db() -> None:
     """Initialize database tables."""
+    # Import cache models to register them with Base.metadata
+    try:
+        from github_client.enrichment_cache import (
+            ActorProfileCache,
+            CommitVerificationCache,
+            RepositoryContextCache,
+            WorkflowStatusCache,
+        )
+    except ImportError:
+        pass  # Enrichment cache tables not available
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

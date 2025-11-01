@@ -288,15 +288,14 @@ class GitHubFeatureExtractor:
     def extract_features(self, event: Event) -> np.ndarray | None:
         """Extract RRCF-optimized feature vector from a GitHub event.
 
-        Features (fixed length ~275):
-        - 4: Temporal (hour, day_of_week, is_weekend, is_night)
+        Features (fixed length ~367):
         - 32: Event type (one-hot hash)
         - 64: Actor login (one-hot hash)
         - 64: Repo name (one-hot hash)
         - 32: Org login (one-hot hash, if present)
         - 3: Actor behavior (decayed count, unique repos, actor ID pattern)
         - 2: Repo activity (decayed count, unique actors)
-        - ~170: Event-specific features (reduced dims: hashed actions, text, etc.)
+        - 170: Event-specific features (hashed actions, text, etc.)
 
         Args:
             event: GitHub Event object from models.py
@@ -314,14 +313,12 @@ class GitHubFeatureExtractor:
         # Increment event counter for lazy decay
         self.total_events += 1
 
-        # Preallocate feature array (4 + 32 + 64 + 3 + 64 + 2 + 32 + 170 = ~371)
-        # Actual size varies by event type, but we'll build and trim
+        # Preallocate feature array (32 + 64 + 3 + 64 + 2 + 32 + 170 = 367)
         repo_name = event.repo.name
 
         # Calculate feature dimensions
         feature_size = (
-            4  # temporal
-            + self.categorical_dims["event_type"]  # 32
+            self.categorical_dims["event_type"]  # 32
             + self.categorical_dims["actor"]  # 64
             + 3  # actor behavior
             + self.categorical_dims["repo"]  # 64
@@ -331,15 +328,6 @@ class GitHubFeatureExtractor:
         )
         features = np.zeros(feature_size, dtype=float)
         idx = 0
-
-        # === TEMPORAL FEATURES (4) ===
-        features[idx] = event.created_at.hour  # 0-23
-        features[idx + 1] = event.created_at.weekday()  # 0-6
-        features[idx + 2] = 1.0 if event.created_at.weekday() >= 5 else 0.0
-        features[idx + 3] = (
-            1.0 if event.created_at.hour < 6 or event.created_at.hour >= 22 else 0.0
-        )
-        idx += 4
 
         # === EVENT TYPE (32, one-hot hash) ===
         event_type_vec = self._hash_categorical(
@@ -771,11 +759,6 @@ def get_suspicious_patterns(
         patterns.append(
             f"High velocity: {actor_stats['total_events']:.1f} decayed events from {event.actor.login}"
         )
-
-    # Unusual timing
-    hour = event.created_at.hour
-    if hour < 4 or hour > 23:
-        patterns.append(f"Unusual timing: {hour}:00")
 
     # Repo hopping
     if actor_stats["unique_repos"] > 20:

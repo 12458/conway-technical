@@ -12,6 +12,10 @@ class ServiceSettings(BaseSettings):
         default=None,
         description="GitHub personal access token for authentication",
     )
+    github_graphql_token: str | None = Field(
+        default=None,
+        description="GitHub token for GraphQL API enrichment (requires repo, read:org, read:user scopes)",
+    )
 
     # Redis settings
     redis_url: str = Field(
@@ -89,6 +93,24 @@ class ServiceSettings(BaseSettings):
     enable_bot_filtering: bool = Field(
         default=True,
         description="Filter out known bot accounts",
+    )
+
+    # GraphQL Enrichment settings
+    enrichment_enabled: bool = Field(
+        default=True,
+        description="Enable GraphQL enrichment for detected anomalies",
+    )
+    enrichment_batch_size: int = Field(
+        default=10,
+        description="Maximum number of enrichments to batch together",
+    )
+    enrichment_timeout_ms: int = Field(
+        default=5000,
+        description="Timeout for enrichment operations in milliseconds",
+    )
+    graphql_api_url: str = Field(
+        default="https://api.github.com/graphql",
+        description="GitHub GraphQL API endpoint URL",
     )
 
     class Config:

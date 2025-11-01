@@ -8,8 +8,13 @@ from typing import Any
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
+from github_client.enriched_models import EnrichedEvent
+from github_client.graphql_client import GitHubGraphQLClient
+from github_client.models import Event
 from service.config import service_settings
 from service.database import AsyncSessionLocal, AnomalySummary
+from service.enrichment_service import EnrichmentService
+from service.enhanced_summarizer import summarize_enriched_anomaly
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +39,7 @@ async def summarize_anomaly_job(
     """RQ job to generate AI summary for an anomaly.
 
     This is the worker function executed by RQ workers.
+    If enrichment is enabled, fetches GraphQL data before summarization.
 
     Args:
         event_id: Database event ID
@@ -44,47 +50,108 @@ async def summarize_anomaly_job(
     Returns:
         Summary data dictionary
     """
-    logger.info(f"Starting summarization for event {event_id}")
+    logger.info(
+        f"Starting summarization for event {event_id} "
+        f"(enrichment: {service_settings.enrichment_enabled})"
+    )
 
     try:
-        # Generate AI summary
-        summary_data = await generate_summary(
-            event_data=event_data,
-            anomaly_score=anomaly_score,
-            suspicious_patterns=suspicious_patterns,
-        )
+        # Check if enrichment is enabled and GraphQL token is available
+        if (
+            service_settings.enrichment_enabled
+            and service_settings.github_graphql_token
+        ):
+            logger.info(f"Enrichment enabled, fetching GraphQL data for {event_id}")
 
-        # Save to database
-        async with AsyncSessionLocal() as session:
-            db_summary = AnomalySummary(
-                event_id=event_id,
-                title=summary_data["title"],
-                severity=summary_data["severity"],
-                root_cause=summary_data["root_cause"],
-                impact=summary_data["impact"],
-                next_steps=summary_data["next_steps"],
-                suspicious_patterns=suspicious_patterns,
+            # Convert event_data dict to Event model
+            # event_data is now in Event-compatible format from to_event_dict()
+            event = Event(**event_data)
+
+            # Initialize GraphQL client and enrichment service
+            async with AsyncSessionLocal() as db_session:
+                async with GitHubGraphQLClient(
+                    token=service_settings.github_graphql_token,
+                    base_url=service_settings.graphql_api_url,
+                ) as graphql_client:
+                    enrichment_service = EnrichmentService(
+                        graphql_client=graphql_client,
+                        db_session=db_session,
+                        enabled=True,
+                    )
+
+                    # Enrich the anomaly
+                    enriched_event = await enrichment_service.enrich_anomaly(
+                        event=event,
+                        anomaly_score=anomaly_score,
+                        suspicious_patterns=suspicious_patterns,
+                    )
+
+                    logger.info(
+                        f"Enrichment complete for {event_id}, "
+                        f"risk level: {enriched_event.risk_level}"
+                    )
+
+                    # Use enhanced summarization
+                    result = await summarize_enriched_anomaly(enriched_event)
+
+                    logger.info(
+                        f"Enrichment stats: {enrichment_service.stats}"
+                    )
+
+                    return result
+
+        else:
+            # Fallback to basic summarization without enrichment
+            if not service_settings.enrichment_enabled:
+                logger.info(f"Enrichment disabled, using basic summarization")
+            elif not service_settings.github_graphql_token:
+                logger.warning(
+                    f"GraphQL token not configured, using basic summarization"
+                )
+
+            # Generate AI summary without enrichment
+            summary_data = await generate_summary(
+                event_data=event_data,
                 anomaly_score=anomaly_score,
-                event_type=event_data["event_type"],
-                actor_login=event_data["actor_login"],
-                repo_name=event_data["repo_name"],
-                raw_event=event_data,
-                event_timestamp=datetime.fromisoformat(event_data["created_at"]),
-                tags=summary_data.get("tags", []),
+                suspicious_patterns=suspicious_patterns,
             )
 
-            session.add(db_summary)
-            await session.commit()
-            await session.refresh(db_summary)
+            # Save to database
+            # Extract fields from Event format
+            event_type = event_data.get("type")
+            actor_login = event_data.get("actor", {}).get("login") if isinstance(event_data.get("actor"), dict) else "unknown"
+            repo_name = event_data.get("repo", {}).get("name") if isinstance(event_data.get("repo"), dict) else "unknown"
 
-            result = db_summary.to_dict()
+            async with AsyncSessionLocal() as session:
+                db_summary = AnomalySummary(
+                    event_id=event_id,
+                    title=summary_data["title"],
+                    severity=summary_data["severity"],
+                    root_cause=summary_data["root_cause"],
+                    impact=summary_data["impact"],
+                    next_steps=summary_data["next_steps"],
+                    suspicious_patterns=suspicious_patterns,
+                    anomaly_score=anomaly_score,
+                    event_type=event_type,
+                    actor_login=actor_login,
+                    repo_name=repo_name,
+                    raw_event=event_data,
+                    event_timestamp=datetime.fromisoformat(event_data["created_at"]),
+                    tags=summary_data.get("tags", []),
+                )
 
-        logger.info(
-            f"✅ Summarization complete for event {event_id}: "
-            f"{summary_data['title']} (severity: {summary_data['severity']})"
-        )
+                session.add(db_summary)
+                await session.commit()
+                await session.refresh(db_summary)
 
-        return result
+                result = db_summary.to_dict()
+
+            logger.info(
+                f"✅ Summarization complete for event {event_id}: "
+                f"{summary_data['title']} (severity: {summary_data['severity']})"
+            )
+
+            return result
 
     except Exception as e:
         logger.exception(f"Error summarizing event {event_id}: {e}")
@@ -126,7 +193,7 @@ def _build_summary_context(
     """Build context string for AI summarization.
 
     Args:
-        event_data: Event data
+        event_data: Event data (in Event model format)
         anomaly_score: Anomaly score
         suspicious_patterns: Detected patterns
 
@@ -135,11 +202,16 @@ def _build_summary_context(
     """
     payload = event_data.get("payload", {})
 
+    # Extract fields from Event format
+    event_type = event_data.get("type")
+    actor_login = event_data.get("actor", {}).get("login") if isinstance(event_data.get("actor"), dict) else None
+    repo_name = event_data.get("repo", {}).get("name") if isinstance(event_data.get("repo"), dict) else None
+
     context = f"""Analyze this GitHub security incident and provide a structured assessment.
 
-Event Type: {event_data['event_type']}
-Actor: {event_data['actor_login']}
-Repository: {event_data['repo_name']}
+Event Type: {event_type}
+Actor: {actor_login}
+Repository: {repo_name}
 Timestamp: {event_data['created_at']}
 Anomaly Score: {anomaly_score:.2f} (threshold: {service_settings.anomaly_threshold})
 
