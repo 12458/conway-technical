@@ -144,6 +144,11 @@ class GitHubFeatureExtractor:
         self.repo_last_seen = {}  # repo -> event counter
         self.repo_actors = OrderedDict()  # repo -> set of actors
 
+        # Time-based velocity tracking (for inhuman speed detection)
+        from collections import deque
+        self.actor_timestamps = OrderedDict()  # actor -> deque of timestamps
+        self.actor_last_event_time = {}  # actor -> last event timestamp
+
         # Event counter for lazy decay
         self.total_events = 0
 
@@ -174,6 +179,8 @@ class GitHubFeatureExtractor:
             self.actor_last_seen.pop(oldest_actor, None)
             self.actor_repos.pop(oldest_actor, None)
             self.actor_event_types.pop(oldest_actor, None)
+            self.actor_timestamps.pop(oldest_actor, None)
+            self.actor_last_event_time.pop(oldest_actor, None)
 
     def _evict_lru_repos(self) -> None:
         """Evict oldest repo if limit exceeded."""
@@ -329,18 +336,184 @@ class GitHubFeatureExtractor:
 
         return min(entropy, 1.0)  # Clamp to [0, 1]
 
+    def _update_actor_timestamps(self, actor_login: str, timestamp: float) -> None:
+        """Update timestamp tracking for an actor with memory limits.
+
+        Args:
+            actor_login: Actor username
+            timestamp: Event timestamp (Unix time in seconds)
+        """
+        from collections import deque
+        from service.config import service_settings
+
+        # Initialize deque if needed
+        if actor_login not in self.actor_timestamps:
+            self.actor_timestamps[actor_login] = deque(maxlen=service_settings.max_timestamps_per_actor)
+
+        # Add current timestamp
+        self.actor_timestamps[actor_login].append(timestamp)
+        self.actor_last_event_time[actor_login] = timestamp
+
+        # Move to end for LRU
+        if actor_login in self.actor_timestamps:
+            self.actor_timestamps.move_to_end(actor_login)
+
+        # Clean up old timestamps outside the time window
+        time_window = service_settings.velocity_time_window
+        cutoff_time = timestamp - time_window
+        timestamps_deque = self.actor_timestamps[actor_login]
+
+        # Remove timestamps older than time window (from left side)
+        while timestamps_deque and timestamps_deque[0] < cutoff_time:
+            timestamps_deque.popleft()
+
+    def _get_time_based_features(self, actor_login: str, current_timestamp: float) -> np.ndarray:
+        """Calculate time-based velocity features for an actor.
+
+        Returns 5 features:
+        1. Events in last N minutes (N = velocity_time_window)
+        2. Average inter-event time delta (seconds)
+        3. Std dev of inter-event times (low = robotic)
+        4. Time since last event (seconds)
+        5. Velocity score (events per minute, normalized)
+
+        Args:
+            actor_login: Actor username
+            current_timestamp: Current event timestamp
+
+        Returns:
+            Numpy array of 5 time-based features
+        """
+        from service.config import service_settings
+
+        features = np.zeros(5, dtype=float)
+
+        if actor_login not in self.actor_timestamps:
+            return features
+
+        timestamps = list(self.actor_timestamps[actor_login])
+        if not timestamps:
+            return features
+
+        time_window = service_settings.velocity_time_window
+        cutoff_time = current_timestamp - time_window
+
+        # Feature 1: Events in time window
+        recent_events = [ts for ts in timestamps if ts >= cutoff_time]
+        features[0] = len(recent_events)
+
+        # Features 2-4: Inter-event time statistics (need at least 2 events)
+        if len(timestamps) >= 2:
+            # Calculate time deltas between consecutive events
+            deltas = [timestamps[i] - timestamps[i-1] for i in range(1, len(timestamps))]
+
+            # Feature 2: Average inter-event time
+            features[1] = np.mean(deltas) if deltas else 0.0
+
+            # Feature 3: Std dev of inter-event times
+            features[2] = np.std(deltas) if len(deltas) > 1 else 0.0
+
+            # Feature 4: Time since last event
+            if actor_login in self.actor_last_event_time:
+                last_time = self.actor_last_event_time[actor_login]
+                features[3] = current_timestamp - last_time
+
+        # Feature 5: Velocity score (events per minute)
+        if len(recent_events) > 0:
+            # Calculate actual time span of recent events
+            if len(recent_events) > 1:
+                time_span = current_timestamp - min(recent_events)
+            else:
+                time_span = time_window
+
+            # Events per minute
+            if time_span > 0:
+                features[4] = (len(recent_events) / time_span) * 60.0
+
+        return features
+
+    def get_velocity_anomaly_score(
+        self, actor_login: str, current_timestamp: float
+    ) -> tuple[float, bool, str]:
+        """Calculate velocity-based anomaly score for an actor.
+
+        This provides a separate anomaly detection mechanism based purely on
+        event rate/velocity, complementing the RRCF-based detection.
+
+        Args:
+            actor_login: Actor username
+            current_timestamp: Current event timestamp
+
+        Returns:
+            Tuple of (velocity_score, is_inhuman_speed, reason):
+            - velocity_score: Events per minute (0 if no data)
+            - is_inhuman_speed: True if exceeds threshold
+            - reason: Human-readable explanation
+        """
+        from service.config import service_settings
+
+        if actor_login not in self.actor_timestamps:
+            return (0.0, False, "No history for actor")
+
+        timestamps = list(self.actor_timestamps[actor_login])
+        if not timestamps:
+            return (0.0, False, "No events in history")
+
+        time_window = service_settings.velocity_time_window
+        cutoff_time = current_timestamp - time_window
+
+        # Count events in time window
+        recent_events = [ts for ts in timestamps if ts >= cutoff_time]
+        event_count = len(recent_events)
+
+        if event_count == 0:
+            return (0.0, False, "No events in time window")
+
+        # Calculate velocity (events per minute)
+        if event_count > 1:
+            time_span = current_timestamp - min(recent_events)
+        else:
+            time_span = time_window
+
+        if time_span == 0:
+            velocity_score = float('inf')
+        else:
+            velocity_score = (event_count / time_span) * 60.0
+
+        # Check if exceeds threshold
+        threshold = service_settings.velocity_threshold_per_min
+        is_inhuman = velocity_score > threshold
+
+        # Build human-readable reason
+        if event_count > 1:
+            avg_time_between = time_span / (event_count - 1) if event_count > 1 else 0
+            reason = (
+                f"{event_count} events in {time_span:.1f}s "
+                f"({velocity_score:.1f} events/min, "
+                f"avg {avg_time_between:.1f}s apart)"
+            )
+        else:
+            reason = f"1 event in window (velocity {velocity_score:.1f} events/min)"
+
+        if is_inhuman:
+            reason += f" - EXCEEDS threshold of {threshold} events/min"
+
+        return (velocity_score, is_inhuman, reason)
+
     def extract_features(self, event: Event) -> np.ndarray | None:
         """Extract RRCF-optimized feature vector from a GitHub event.
 
-        Features (fixed length ~297):
+        Features (fixed length 304):
         - 32: Event type (one-hot hash)
         - 64: Actor login (one-hot hash)
-        - 64: Repo name (one-hot hash)
-        - 32: Org login (one-hot hash, if present)
         - 3: Actor behavior (decayed count, unique repos, actor ID pattern)
+        - 1: Actor login entropy (randomness indicator for bot/spam detection)
+        - 64: Repo name (one-hot hash)
         - 2: Repo activity (decayed count, unique actors)
+        - 1: Repo name entropy (randomness indicator for bot/spam detection)
+        - 32: Org login (one-hot hash, if present)
         - 100: Event-specific features (hashed actions, text, etc.)
-              Note: Reduced from 170 due to removal of non-existent PushEvent fields
+        - 5: Time-based velocity features (events in window, inter-event stats, velocity)
 
         Args:
             event: GitHub Event object from models.py
@@ -358,7 +531,13 @@ class GitHubFeatureExtractor:
         # Increment event counter for lazy decay
         self.total_events += 1
 
-        # Preallocate feature array (32 + 64 + 3 + 64 + 2 + 32 + 100 = 297)
+        # Extract timestamp from event (created_at is ISO 8601 string)
+        import datetime
+        event_timestamp = datetime.datetime.fromisoformat(
+            event.created_at.replace('Z', '+00:00')
+        ).timestamp()
+
+        # Preallocate feature array (32 + 64 + 3 + 1 + 64 + 2 + 1 + 32 + 100 + 5 = 304)
         repo_name = event.repo.name
 
         # Calculate feature dimensions
@@ -366,10 +545,13 @@ class GitHubFeatureExtractor:
             self.categorical_dims["event_type"]  # 32
             + self.categorical_dims["actor"]  # 64
             + 3  # actor behavior
+            + 1  # actor entropy
             + self.categorical_dims["repo"]  # 64
             + 2  # repo activity
+            + 1  # repo entropy
             + self.categorical_dims["org"]  # 32
-            + 100  # type-specific (reduced from 170 due to PushEvent field removal)
+            + 100  # type-specific features
+            + 5  # time-based velocity features
         )
         features = np.zeros(feature_size, dtype=float)
         idx = 0
@@ -416,11 +598,18 @@ class GitHubFeatureExtractor:
         # Evict LRU if needed
         self._evict_lru_actors()
 
+        # Update timestamp tracking for velocity detection
+        self._update_actor_timestamps(actor_login, event_timestamp)
+
         # Actor behavioral features (3)
         features[idx] = decayed_count + 1.0  # Current decayed count
         features[idx + 1] = len(self.actor_repos[actor_login])
         features[idx + 2] = event.actor.id % 10000
         idx += 3
+
+        # Actor entropy (1) - high entropy indicates random/bot-generated names
+        features[idx] = self._calculate_entropy(actor_login)
+        idx += 1
 
         # === REPOSITORY FEATURES ===
         # One-hot hash (64)
@@ -457,6 +646,10 @@ class GitHubFeatureExtractor:
         features[idx + 1] = len(self.repo_actors[repo_name])
         idx += 2
 
+        # Repo entropy (1) - high entropy indicates random/bot-generated repo names
+        features[idx] = self._calculate_entropy(repo_name)
+        idx += 1
+
         # === ORGANIZATION (32, one-hot hash) ===
         org_login = event.org.login if event.org else ""
         org_vec = self._hash_categorical(
@@ -465,9 +658,14 @@ class GitHubFeatureExtractor:
         features[idx : idx + len(org_vec)] = org_vec
         idx += len(org_vec)
 
-        # === EVENT-SPECIFIC FEATURES (170) ===
+        # === EVENT-SPECIFIC FEATURES (100) ===
         type_features = self._extract_type_specific_features(event)
         features[idx : idx + len(type_features)] = type_features
+        idx += len(type_features)
+
+        # === TIME-BASED VELOCITY FEATURES (5) ===
+        time_features = self._get_time_based_features(actor_login, event_timestamp)
+        features[idx : idx + len(time_features)] = time_features
 
         # Batch normalization updates (every N events)
         if self.normalize and self.total_events % self.normalization_frequency == 0:
@@ -483,11 +681,12 @@ class GitHubFeatureExtractor:
         """Extract features specific to each event type using proper encoding.
 
         Returns exactly 100 features (padded with 0s if event type has fewer).
-        Reduced from 170 due to removal of non-existent PushEvent fields.
         Uses one-hot hashing for actions and text n-gram hashing for text fields.
+
+        Note: Total feature vector is 299 (includes 2 entropy features added separately).
         """
         p = event.payload
-        features = np.zeros(100, dtype=float)  # Preallocate (was 170)
+        features = np.zeros(100, dtype=float)
         idx = 0
         action_dim = self.categorical_dims["action"]  # 16
 

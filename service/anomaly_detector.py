@@ -60,17 +60,20 @@ class StreamingAnomalyDetector:
 
     def process_event(
         self, event: Event
-    ) -> tuple[float | None, list[str], np.ndarray | None]:
+    ) -> tuple[float | None, list[str], np.ndarray | None, float, bool, str]:
         """Process a single event and return anomaly score.
 
         Args:
             event: GitHub Event to process
 
         Returns:
-            Tuple of (anomaly_score, suspicious_patterns, features)
+            Tuple of (anomaly_score, suspicious_patterns, features, velocity_score, is_inhuman_speed, velocity_reason)
             - anomaly_score: CoDisp score (None if event filtered or no features)
             - suspicious_patterns: List of detected patterns
             - features: Extracted feature vector (None if filtered)
+            - velocity_score: Events per minute velocity score
+            - is_inhuman_speed: True if velocity exceeds threshold
+            - velocity_reason: Human-readable velocity explanation
         """
         # Extract features
         features = self.extractor.extract_features(event)
@@ -78,7 +81,18 @@ class StreamingAnomalyDetector:
         # Check if event was filtered (e.g., bot)
         if features is None:
             logger.debug(f"Event {event.id} filtered (likely bot: {event.actor.login})")
-            return None, [], None
+            return None, [], None, 0.0, False, "Event filtered"
+
+        # Extract timestamp for velocity detection
+        import datetime
+        event_timestamp = datetime.datetime.fromisoformat(
+            event.created_at.replace('Z', '+00:00')
+        ).timestamp()
+
+        # Get velocity-based anomaly score
+        velocity_score, is_inhuman_speed, velocity_reason = (
+            self.extractor.get_velocity_anomaly_score(event.actor.login, event_timestamp)
+        )
 
         # Get suspicious patterns using rule-based detection
         suspicious_patterns = get_suspicious_patterns(event, self.extractor)
@@ -112,30 +126,28 @@ class StreamingAnomalyDetector:
 
         logger.debug(
             f"Event {event.id} - CoDisp: {avg_codisp:.2f}, "
-            f"Patterns: {len(suspicious_patterns)}, Type: {event.type}"
+            f"Patterns: {len(suspicious_patterns)}, Type: {event.type}, "
+            f"Velocity: {velocity_score:.1f} events/min, Inhuman: {is_inhuman_speed}"
         )
 
-        return avg_codisp, suspicious_patterns, features
+        return avg_codisp, suspicious_patterns, features, velocity_score, is_inhuman_speed, velocity_reason
 
-    def is_anomaly(self, score: float, patterns: list[str]) -> bool:
+    def is_anomaly(
+        self, score: float, patterns: list[str], is_inhuman_speed: bool = False
+    ) -> bool:
         """Check if event should be flagged as anomaly.
 
         Args:
             score: CoDisp score
-            patterns: Suspicious patterns detected
+            patterns: Suspicious patterns detected (not used in detection)
+            is_inhuman_speed: Whether velocity-based detection flagged inhuman speed
 
         Returns:
-            True if score exceeds threshold OR critical patterns detected
+            True if score exceeds threshold OR inhuman speed
         """
-        # Always flag if critical patterns detected (destructive actions only)
-        # Note: "Large push" removed because GitHub Events API doesn't provide size field
-        critical_keywords = ["Destructive action"]
-        has_critical_pattern = any(
-            any(keyword in pattern for keyword in critical_keywords)
-            for pattern in patterns
-        )
-
-        return score >= self.threshold or has_critical_pattern
+        # Removed critical pattern checking due to false positives
+        # Only use RRCF score and velocity-based detection
+        return score >= self.threshold or is_inhuman_speed
 
     def get_stats(self) -> dict[str, Any]:
         """Get detector statistics.

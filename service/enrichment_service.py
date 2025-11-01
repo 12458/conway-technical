@@ -109,7 +109,7 @@ class EnrichmentService:
 
         self._enrichment_count += 1
         logger.debug(
-            f"Enrichment complete for {event.id}, risk level: {enriched.risk_level}"
+            f"Enrichment complete for {event.id}, score: {enriched.anomaly_score:.2f}"
         )
 
         return enriched

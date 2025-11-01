@@ -132,14 +132,16 @@ class GitHubEventsPoller:
                     self.event_count += 1
 
                     # Run anomaly detection
-                    score, patterns, features = detector.process_event(event)
+                    score, patterns, features, velocity_score, is_inhuman_speed, velocity_reason = (
+                        detector.process_event(event)
+                    )
 
                     # Skip if event was filtered (e.g., bot)
                     if score is None:
                         continue
 
-                    # Determine if anomaly
-                    is_anomaly = detector.is_anomaly(score, patterns)
+                    # Determine if anomaly (includes velocity-based detection)
+                    is_anomaly = detector.is_anomaly(score, patterns, is_inhuman_speed)
 
                     # Create database record
                     db_event = GitHubEvent(
@@ -166,8 +168,12 @@ class GitHubEventsPoller:
 
                         logger.info(
                             f"🚨 ANOMALY DETECTED: {event.type} by {event.actor.login} "
-                            f"on {event.repo.name} (score: {score:.2f}, patterns: {len(patterns)})"
+                            f"on {event.repo.name} (score: {score:.2f}, patterns: {len(patterns)}, "
+                            f"velocity: {velocity_score:.1f} events/min, inhuman: {is_inhuman_speed})"
                         )
+
+                        if is_inhuman_speed:
+                            logger.info(f"   ⚡ Velocity anomaly: {velocity_reason}")
 
                         # Enqueue job for AI summarization
                         # Use to_event_dict() to get Event-compatible format for enrichment

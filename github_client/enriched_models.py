@@ -195,7 +195,6 @@ class EnrichedEvent(BaseModel):
             "actor": self.event.actor.login,
             "repo": self.event.repo.name,
             "anomaly_score": self.anomaly_score,
-            "risk_level": self.risk_level,
             "patterns": self.suspicious_patterns,
             "actor_age_days": (
                 self.actor_profile.account_age_days if self.actor_profile else None

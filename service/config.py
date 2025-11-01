@@ -75,6 +75,20 @@ class ServiceSettings(BaseSettings):
         description="Shingle size for streaming (1 = no shingling)",
     )
 
+    # Velocity-based anomaly detection settings
+    velocity_time_window: int = Field(
+        default=300,
+        description="Time window in seconds for velocity detection (default: 5 minutes)",
+    )
+    velocity_threshold_per_min: float = Field(
+        default=20.0,
+        description="Events per minute threshold for 'inhuman speed' detection",
+    )
+    max_timestamps_per_actor: int = Field(
+        default=200,
+        description="Maximum number of timestamps to store per actor (memory limit)",
+    )
+
     # Queue settings
     queue_name: str = Field(
         default="github-anomalies",
