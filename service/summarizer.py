@@ -225,9 +225,8 @@ Provide:
 
 - severity: Choose ONE of: low, medium, high, or critical based on these criteria:
   * CRITICAL: Destructive actions (force push, branch deletion), privilege escalations,
-    verified security incidents, malicious code injection, compromised credentials
-  * HIGH: Suspicious new accounts performing sensitive actions, unusual permission changes,
-    high anomaly scores (>80) with suspicious patterns
+    verified security incidents, malicious code injection, compromised credentials, obfuscated activity, spammy behavior
+  * HIGH: Suspicious new accounts performing sensitive actions, unusual permission changes
   * MEDIUM: Unusual patterns, policy violations, moderate anomaly scores (40-80),
     minor workflow failures
   * LOW: Benign unusual activity, low anomaly scores (<40), standard maintenance actions
