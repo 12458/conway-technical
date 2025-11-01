@@ -474,10 +474,11 @@ class GitHubFeatureExtractor:
         else:
             time_span = time_window
 
-        if time_span == 0:
-            velocity_score = float('inf')
-        else:
-            velocity_score = (event_count / time_span) * 60.0
+        # Prevent division by zero/near-zero: use minimum 1 second
+        # (any faster than 1 event/sec is clearly automated anyway)
+        min_time_span = 1.0
+        time_span = max(time_span, min_time_span)
+        velocity_score = (event_count / time_span) * 60.0
 
         # Check if exceeds threshold
         threshold = service_settings.velocity_threshold_per_min
