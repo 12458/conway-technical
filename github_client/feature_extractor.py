@@ -293,6 +293,42 @@ class GitHubFeatureExtractor:
 
         return (features - self.feature_mean) / std
 
+    def _calculate_entropy(self, text: str) -> float:
+        """Calculate Shannon entropy of a string (normalized to 0-1).
+
+        Higher entropy indicates more randomness/uniformity in character distribution,
+        which often correlates with bot-generated or spam accounts.
+
+        Args:
+            text: String to calculate entropy for
+
+        Returns:
+            Normalized entropy in [0, 1], where 1 is maximum randomness
+        """
+        if not text:
+            return 0.0
+
+        # Calculate character frequency
+        char_counts = defaultdict(int)
+        for char in text.lower():
+            char_counts[char] += 1
+
+        # Calculate Shannon entropy
+        length = len(text)
+        entropy = 0.0
+        for count in char_counts.values():
+            if count > 0:
+                p = count / length
+                entropy -= p * np.log2(p)
+
+        # Normalize by max possible entropy (log2 of unique chars)
+        # For typical strings, max entropy ~= log2(36) for alphanumeric
+        max_entropy = np.log2(min(len(char_counts), 36))
+        if max_entropy > 0:
+            entropy = entropy / max_entropy
+
+        return min(entropy, 1.0)  # Clamp to [0, 1]
+
     def extract_features(self, event: Event) -> np.ndarray | None:
         """Extract RRCF-optimized feature vector from a GitHub event.
 

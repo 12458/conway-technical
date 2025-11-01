@@ -1,7 +1,7 @@
 """Database models and session management."""
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, Text, select
@@ -9,6 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from service.config import service_settings
+
+
+def utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 class Base(DeclarativeBase):
@@ -38,8 +43,8 @@ class GitHubEvent(Base):
     org_login: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, index=True)
-    ingested_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     # Raw payload
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
@@ -131,6 +136,7 @@ class AnomalySummary(Base):
     # Summary fields
     title: Mapped[str] = mapped_column(String(200))
     severity: Mapped[str] = mapped_column(String(20), index=True)  # low, medium, high, critical
+    severity_reasoning: Mapped[str | None] = mapped_column(String(500), nullable=True)  # LLM explanation for severity
 
     # Structured summary
     root_cause: Mapped[list[str]] = mapped_column(JSON)  # 3-5 bullets
@@ -150,8 +156,8 @@ class AnomalySummary(Base):
     raw_event: Mapped[dict[str, Any]] = mapped_column(JSON)
 
     # Timestamps
-    event_timestamp: Mapped[datetime] = mapped_column(DateTime, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    event_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
 
     # Metadata
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
@@ -167,6 +173,7 @@ class AnomalySummary(Base):
             "event_id": self.event_id,
             "title": self.title,
             "severity": self.severity,
+            "severity_reasoning": self.severity_reasoning,
             "root_cause": self.root_cause,
             "impact": self.impact,
             "next_steps": self.next_steps,
@@ -187,13 +194,14 @@ class AnomalySummary(Base):
         Returns:
             AnomalySummaryResponse with full validation and type safety
         """
-        from service.sse_models import AnomalySummaryResponse
+        from service.sse_models import AnomalySummaryResponse, Severity
 
         return AnomalySummaryResponse(
             id=self.id,
             event_id=self.event_id,
             title=self.title,
-            severity=self.severity,  # type: ignore - validated at runtime
+            severity=Severity(self.severity),
+            severity_reasoning=self.severity_reasoning,
             root_cause=self.root_cause,
             impact=self.impact,
             next_steps=self.next_steps,

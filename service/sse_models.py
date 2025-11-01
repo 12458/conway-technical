@@ -4,9 +4,21 @@ This module defines all SSE message types with full validation and type safety.
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+
+class Severity(str, Enum):
+    """Severity levels for anomaly detection.
+
+    Enum values ensure type safety and consistent severity classification.
+    """
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
 
 
 class AnomalySummaryResponse(BaseModel):
@@ -30,9 +42,16 @@ class AnomalySummaryResponse(BaseModel):
         max_length=200,
         examples=["Suspicious Force Push to Main Branch by New Account"],
     )
-    severity: Literal["low", "medium", "high", "critical"] = Field(
+    severity: Severity = Field(
         description="Severity level of the anomaly",
-        examples=["high"],
+        examples=[Severity.HIGH],
+    )
+    severity_reasoning: str = Field(
+        description="AI-generated explanation for why this severity level was assigned (1-2 sentences)",
+        max_length=500,
+        examples=[
+            "Classified as HIGH because a newly created account with no contribution history performed a force push to a critical repository's main branch."
+        ],
     )
     root_cause: list[str] = Field(
         description="AI-generated root cause analysis (3-5 bullet points)",
@@ -152,6 +171,7 @@ class AnomalySummaryResponse(BaseModel):
                     "event_id": "12345678901",
                     "title": "Suspicious Force Push to Main Branch by New Account",
                     "severity": "high",
+                    "severity_reasoning": "Classified as HIGH because a newly created account with no contribution history performed a force push to a critical repository's main branch.",
                     "root_cause": [
                         "Force push detected on protected branch",
                         "Actor account created within last 7 days",
@@ -258,6 +278,7 @@ class AnomalyMessage(SSEMessageBase):
                         "event_id": "12345678901",
                         "title": "Suspicious Force Push to Main Branch by New Account",
                         "severity": "high",
+                        "severity_reasoning": "Classified as HIGH because a newly created account with no contribution history performed a force push to a critical repository's main branch.",
                         "root_cause": [
                             "Force push detected on protected branch",
                             "Actor account created within last 7 days",

@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from github_client.enriched_models import EnrichedEvent
 from service.config import service_settings
 from service.database import AsyncSessionLocal, AnomalySummary
+from service.sse_models import Severity
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,8 @@ class EnhancedSummaryResponse(BaseModel):
     """Pydantic model for enhanced structured AI summary output."""
 
     title: str
-    severity: str
+    severity: Severity
+    severity_reasoning: str
     root_cause: list[str]
     impact: list[str]
     next_steps: list[str]
@@ -36,19 +38,11 @@ async def summarize_enriched_anomaly(enriched_event: EnrichedEvent) -> dict[str,
         Summary data dictionary
     """
     event = enriched_event.event
-    logger.info(
-        f"Starting enhanced summarization for event {event.id} "
-        f"(risk level: {enriched_event.risk_level})"
-    )
+    logger.info(f"Starting enhanced summarization for event {event.id}")
 
     try:
         # Generate AI summary with enriched context
         summary_data = await generate_enhanced_summary(enriched_event)
-
-        # Override severity based on enrichment if needed
-        summary_data["severity"] = _compute_final_severity(
-            summary_data["severity"], enriched_event
-        )
 
         # Save to database
         async with AsyncSessionLocal() as session:
@@ -56,6 +50,7 @@ async def summarize_enriched_anomaly(enriched_event: EnrichedEvent) -> dict[str,
                 event_id=event.id,
                 title=summary_data["title"],
                 severity=summary_data["severity"],
+                severity_reasoning=summary_data["severity_reasoning"],
                 root_cause=summary_data["root_cause"],
                 impact=summary_data["impact"],
                 next_steps=summary_data["next_steps"],
@@ -66,7 +61,7 @@ async def summarize_enriched_anomaly(enriched_event: EnrichedEvent) -> dict[str,
                 repo_name=event.repo.name,
                 raw_event=event.model_dump(mode="json"),
                 event_timestamp=event.created_at,
-                tags=summary_data.get("tags", []) + [f"risk:{enriched_event.risk_level.lower()}"],
+                tags=summary_data.get("tags", []),
             )
 
             session.add(db_summary)
@@ -77,8 +72,7 @@ async def summarize_enriched_anomaly(enriched_event: EnrichedEvent) -> dict[str,
 
         logger.info(
             f"✅ Enhanced summarization complete for event {event.id}: "
-            f"{summary_data['title']} (severity: {summary_data['severity']}, "
-            f"risk: {enriched_event.risk_level})"
+            f"{summary_data['title']} (severity: {summary_data['severity']})"
         )
 
         return result
@@ -129,8 +123,7 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
         f"Actor: {event.actor.login}",
         f"Repository: {event.repo.name}",
         f"Timestamp: {event.created_at}",
-        f"Anomaly Score: {enriched_event.anomaly_score:.2f} (threshold: {service_settings.anomaly_threshold})",
-        f"Computed Risk Level: {enriched_event.risk_level}\n",
+        f"Anomaly Score: {enriched_event.anomaly_score:.2f} (threshold: {service_settings.anomaly_threshold})\n",
     ]
 
     # Suspicious patterns
@@ -241,15 +234,29 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
         ]
     )
 
-    # Instructions for AI
+    # Instructions for AI with detailed severity criteria
     context_parts.extend(
         [
-            "Based on the above enriched context, provide:",
+            "Based on the above enriched context, provide:\n",
             "- title: A concise incident description (max 200 chars)",
-            "- severity: One of: low, medium, high, or critical (consider enrichment context)",
+            "",
+            "- severity: Choose ONE of: low, medium, high, or critical based on these criteria:",
+            "  * CRITICAL: Destructive actions (force push, branch deletion), privilege escalations, ",
+            "    verified security incidents, malicious code injection, compromised credentials",
+            "  * HIGH: Suspicious new accounts (<7 days) performing sensitive actions on critical repos,",
+            "    unsigned commits to protected branches, failed CI/CD with security implications,",
+            "    unusual permission changes",
+            "  * MEDIUM: Unusual patterns from established accounts, policy violations, moderate anomaly scores,",
+            "    unsigned commits on standard repos, minor workflow failures, inactive accounts with activity",
+            "  * LOW: Benign unusual activity, legitimate owner/maintainer maintenance actions,",
+            "    low anomaly scores (<50), administrative tasks by trusted users",
+            "",
+            "- severity_reasoning: 1-2 sentences explaining WHY you chose this severity level",
+            "  (reference specific enrichment data: actor profile, repo criticality, patterns detected)",
+            "",
             "- root_cause: 3-5 bullet points explaining what happened (use enrichment data)",
             "- impact: 3-5 bullet points on potential consequences (assess based on repo criticality, actor trust, etc.)",
-            "- next_steps: 3-5 actionable remediation steps (prioritized by risk)",
+            "- next_steps: 3-5 actionable remediation steps (prioritized by severity)",
             "- tags: Relevant security/incident classification tags",
         ]
     )
@@ -299,106 +306,10 @@ async def _generate_with_openai(context: str) -> dict[str, Any]:
     # Validate and return
     return {
         "title": summary.title[:200],
-        "severity": summary.severity,
+        "severity": summary.severity.value,  # Convert enum to string
+        "severity_reasoning": summary.severity_reasoning[:500],
         "root_cause": summary.root_cause[:5],
         "impact": summary.impact[:5],
         "next_steps": summary.next_steps[:5],
         "tags": summary.tags[:10],
     }
-
-
-def _is_owner_or_maintainer_action(enriched_event: EnrichedEvent) -> bool:
-    """Check if the event is an owner/maintainer performing administrative actions.
-
-    Args:
-        enriched_event: EnrichedEvent with actor and repo data
-
-    Returns:
-        True if this is likely an owner/maintainer administrative action
-    """
-    event = enriched_event.event
-    actor_login = event.actor.login
-    repo_name = event.repo.name
-
-    # Check if actor is the repo owner (owner/repo-name pattern)
-    repo_owner = repo_name.split("/")[0] if "/" in repo_name else ""
-    is_repo_owner = actor_login == repo_owner
-
-    # Check if actor is in the repo's organization (if enrichment available)
-    is_org_member = False
-    if enriched_event.actor_profile and enriched_event.actor_profile.organizations:
-        # Extract org from repo name
-        org_name = repo_owner  # For org repos, owner == org
-        is_org_member = org_name in enriched_event.actor_profile.organizations
-
-    # Define low-risk administrative event types
-    low_risk_admin_types = {
-        "IssuesEvent",  # Issue assignment, labels, etc.
-        "IssueCommentEvent",  # Comments (unless on external PRs)
-    }
-
-    # Check for self-authored PR comments
-    is_self_authored = False
-    if event.type == "IssueCommentEvent":
-        issue = event.payload.get("issue", {})
-        issue_user = issue.get("user", {})
-        if issue_user.get("login") == actor_login:
-            is_self_authored = True
-
-    return (is_repo_owner or is_org_member) and (
-        event.type in low_risk_admin_types or is_self_authored
-    )
-
-
-def _compute_final_severity(ai_severity: str, enriched_event: EnrichedEvent) -> str:
-    """Compute final severity considering both AI assessment and enrichment data.
-
-    Args:
-        ai_severity: Severity suggested by AI
-        enriched_event: EnrichedEvent with risk level
-
-    Returns:
-        Final severity level (low, medium, high, critical)
-    """
-    # Map AI severity and risk level to numeric scores
-    severity_scores = {"low": 1, "medium": 2, "high": 3, "critical": 4}
-    risk_scores = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
-
-    ai_score = severity_scores.get(ai_severity.lower(), 2)
-    risk_score = risk_scores.get(enriched_event.risk_level, 2)
-
-    # Take the maximum (most severe)
-    final_score = max(ai_score, risk_score)
-
-    # Downweight owner/maintainer administrative actions
-    if _is_owner_or_maintainer_action(enriched_event):
-        # Cap severity at MEDIUM for benign admin actions
-        final_score = min(final_score, 2)
-
-    # Anomaly score correlation (prevent miscalibration)
-    # Low anomaly scores should not result in HIGH/CRITICAL severity
-    if enriched_event.anomaly_score < 50:
-        final_score = min(final_score, 2)  # Cap at MEDIUM
-    # Very high anomaly scores should be at least MEDIUM
-    if enriched_event.anomaly_score > 100:
-        final_score = max(final_score, 2)  # Floor at MEDIUM
-
-    # Additional escalation rules (removed site_admin auto-escalation)
-    # Site admin actions are not inherently risky - rely on other signals
-
-    if enriched_event.repository_context and enriched_event.repository_context.is_critical:
-        # Critical repos warrant higher scrutiny, but not automatic escalation
-        # Only escalate if there are other risk signals
-        if len(enriched_event.suspicious_patterns) > 0:
-            final_score = max(final_score, 3)  # At least HIGH for critical repos with patterns
-
-    if (
-        enriched_event.commit_verification
-        and not enriched_event.commit_verification.is_verified
-        and enriched_event.repository_context
-    ):
-        final_score = max(final_score, 2)  # At least MEDIUM for unsigned commits
-
-    # Map back to severity string
-    score_to_severity = {1: "low", 2: "medium", 3: "high", 4: "critical"}
-    return score_to_severity[final_score]

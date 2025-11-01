@@ -15,6 +15,7 @@ from service.config import service_settings
 from service.database import AsyncSessionLocal, AnomalySummary
 from service.enrichment_service import EnrichmentService
 from service.enhanced_summarizer import summarize_enriched_anomaly
+from service.sse_models import Severity
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,8 @@ class SummaryResponse(BaseModel):
     """Pydantic model for structured AI summary output."""
 
     title: str
-    severity: str
+    severity: Severity
+    severity_reasoning: str
     root_cause: list[str]
     impact: list[str]
     next_steps: list[str]
@@ -86,10 +88,7 @@ async def summarize_anomaly_job(
                         suspicious_patterns=suspicious_patterns,
                     )
 
-                    logger.info(
-                        f"Enrichment complete for {event_id}, "
-                        f"risk level: {enriched_event.risk_level}"
-                    )
+                    logger.info(f"Enrichment complete for {event_id}")
 
                     # Use enhanced summarization
                     result = await summarize_enriched_anomaly(enriched_event)
@@ -127,6 +126,7 @@ async def summarize_anomaly_job(
                     event_id=event_id,
                     title=summary_data["title"],
                     severity=summary_data["severity"],
+                    severity_reasoning=summary_data["severity_reasoning"],
                     root_cause=summary_data["root_cause"],
                     impact=summary_data["impact"],
                     next_steps=summary_data["next_steps"],
@@ -223,10 +223,22 @@ Event Payload:
 
 Provide:
 - title: A concise incident description (max 200 chars)
-- severity: One of: low, medium, high, or critical
+
+- severity: Choose ONE of: low, medium, high, or critical based on these criteria:
+  * CRITICAL: Destructive actions (force push, branch deletion), privilege escalations,
+    verified security incidents, malicious code injection, compromised credentials
+  * HIGH: Suspicious new accounts performing sensitive actions, unusual permission changes,
+    high anomaly scores (>80) with suspicious patterns
+  * MEDIUM: Unusual patterns, policy violations, moderate anomaly scores (40-80),
+    minor workflow failures
+  * LOW: Benign unusual activity, low anomaly scores (<40), standard maintenance actions
+
+- severity_reasoning: 1-2 sentences explaining WHY you chose this severity level
+  (reference anomaly score and patterns detected)
+
 - root_cause: 3-5 bullet points explaining what happened
 - impact: 3-5 bullet points on potential consequences
-- next_steps: 3-5 actionable remediation steps
+- next_steps: 3-5 actionable remediation steps (prioritized by severity)
 - tags: Relevant security/incident classification tags"""
 
     return context
@@ -266,7 +278,8 @@ async def _generate_with_openai(context: str) -> dict[str, Any]:
     # Validate and return
     return {
         "title": summary.title[:200],
-        "severity": summary.severity,
+        "severity": summary.severity.value,
+        "severity_reasoning": summary.severity_reasoning[:500],
         "root_cause": summary.root_cause[:5],
         "impact": summary.impact[:5],
         "next_steps": summary.next_steps[:5],
