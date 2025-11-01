@@ -129,23 +129,8 @@ class TestEventPayloads:
         assert payload.head == "abc123"
         assert payload.before == "def456"
 
-    def test_push_event_payload_with_optional_fields(self, sample_commit_data):
-        """Test PushEventPayload with optional fields."""
-        data = {
-            "repository_id": 123,
-            "push_id": 456,
-            "ref": "refs/heads/main",
-            "head": "abc123",
-            "before": "def456",
-            "size": 3,
-            "distinct_size": 2,
-            "commits": [sample_commit_data],
-        }
-        payload = PushEventPayload.model_validate(data)
-
-        assert payload.size == 3
-        assert payload.distinct_size == 2
-        assert len(payload.commits) == 1
+    # test_push_event_payload_with_optional_fields removed because GitHub Events API
+    # does not provide size, distinct_size, or commits fields
 
     def test_create_event_payload(self):
         """Test CreateEventPayload model."""
@@ -716,20 +701,8 @@ class TestUpdatedEventPayloads:
         assert len(payload.pages) == 1
         assert payload.pages[0].page_name == "Home"
 
-    def test_push_event_with_commits(self, sample_commit_data):
-        """Test PushEventPayload with Commit models."""
-        data = {
-            "repository_id": 123,
-            "push_id": 456,
-            "ref": "refs/heads/main",
-            "head": "abc123",
-            "before": "def456",
-            "commits": [sample_commit_data],
-        }
-        payload = PushEventPayload.model_validate(data)
-
-        assert len(payload.commits) == 1
-        assert payload.commits[0].sha == "7a8f3ac80e2ad2f6842cb86f576d4bfe2c03e300"
+    # test_push_event_with_commits removed because GitHub Events API
+    # does not provide commits field
 
 
 @pytest.mark.unit

@@ -60,6 +60,14 @@ KNOWN_BOTS = {
     "linear[bot]",
     "gitguardian[bot]",
     "copilot[bot]",
+    # Additional bots for moderate filtering
+    "cloudflare-workers-and-pages[bot]",
+    "release-please[bot]",
+    "TheBoatyMcBotFace",  # Release-please style bot
+    "Copilot",  # GitHub Copilot SWE agent
+    "soc-se-bot",  # Educational institution bot
+    "cursoragent[bot]",
+    "gemini[bot]",
 }
 
 
@@ -288,14 +296,15 @@ class GitHubFeatureExtractor:
     def extract_features(self, event: Event) -> np.ndarray | None:
         """Extract RRCF-optimized feature vector from a GitHub event.
 
-        Features (fixed length ~367):
+        Features (fixed length ~297):
         - 32: Event type (one-hot hash)
         - 64: Actor login (one-hot hash)
         - 64: Repo name (one-hot hash)
         - 32: Org login (one-hot hash, if present)
         - 3: Actor behavior (decayed count, unique repos, actor ID pattern)
         - 2: Repo activity (decayed count, unique actors)
-        - 170: Event-specific features (hashed actions, text, etc.)
+        - 100: Event-specific features (hashed actions, text, etc.)
+              Note: Reduced from 170 due to removal of non-existent PushEvent fields
 
         Args:
             event: GitHub Event object from models.py
@@ -313,7 +322,7 @@ class GitHubFeatureExtractor:
         # Increment event counter for lazy decay
         self.total_events += 1
 
-        # Preallocate feature array (32 + 64 + 3 + 64 + 2 + 32 + 170 = 367)
+        # Preallocate feature array (32 + 64 + 3 + 64 + 2 + 32 + 100 = 297)
         repo_name = event.repo.name
 
         # Calculate feature dimensions
@@ -324,7 +333,7 @@ class GitHubFeatureExtractor:
             + self.categorical_dims["repo"]  # 64
             + 2  # repo activity
             + self.categorical_dims["org"]  # 32
-            + 170  # type-specific (fixed at 170 after reduction)
+            + 100  # type-specific (reduced from 170 due to PushEvent field removal)
         )
         features = np.zeros(feature_size, dtype=float)
         idx = 0
@@ -437,11 +446,12 @@ class GitHubFeatureExtractor:
     def _extract_type_specific_features(self, event: Event) -> np.ndarray:
         """Extract features specific to each event type using proper encoding.
 
-        Returns exactly 170 features (padded with 0s if event type has fewer).
+        Returns exactly 100 features (padded with 0s if event type has fewer).
+        Reduced from 170 due to removal of non-existent PushEvent fields.
         Uses one-hot hashing for actions and text n-gram hashing for text fields.
         """
         p = event.payload
-        features = np.zeros(170, dtype=float)  # Preallocate
+        features = np.zeros(100, dtype=float)  # Preallocate (was 170)
         idx = 0
         action_dim = self.categorical_dims["action"]  # 16
 
@@ -450,33 +460,16 @@ class GitHubFeatureExtractor:
             idx += action_dim  # Skip zeros
 
             ref = p.get("ref", "")
-            commits = p.get("commits", []) or []
 
-            # Scalar features (9)
-            features[idx] = p.get("size") or 0
-            features[idx + 1] = p.get("distinct_size") or 0
-            features[idx + 2] = (
+            # Scalar features (2) - only using real API fields
+            # Note: GitHub Events API does NOT provide size, distinct_size, or commits
+            features[idx] = (
                 1.0 if ref.endswith("/main") or ref.endswith("/master") else 0.0
             )
-            features[idx + 3] = ref.count("/")
-            features[idx + 4] = len(commits)
-            features[idx + 5] = (
-                sum(len(c.get("message", "")) for c in commits) / max(len(commits), 1)
-            )
-            features[idx + 6] = 1.0 if (p.get("size") or 0) == 0 else 0.0
-            features[idx + 7] = (
-                1.0 if (p.get("size") or 0) != (p.get("distinct_size") or 0) else 0.0
-            )
-            features[idx + 8] = 1.0 if p.get("forced", False) else 0.0
-            idx += 9
-
-            # Commit message n-gram hashing (64 features)
-            commit_text = " ".join(c.get("message", "") for c in commits)
-            commit_vec = self._hash_text_ngrams(
-                commit_text, self.text_dims["commits"], seed=10
-            )
-            features[idx : idx + len(commit_vec)] = commit_vec
-            # Remaining positions stay 0 (auto-padded)
+            features[idx + 1] = ref.count("/")
+            # Removed: size, distinct_size, commit count, avg message length,
+            # empty push flag, distinct size comparison, commit message hashing
+            # Total removed: 6 scalar + 64 text = 70 features
 
         elif event.type == "PullRequestEvent":
             action = p.get("action", "")
@@ -751,45 +744,31 @@ def get_suspicious_patterns(
         List of suspicious pattern descriptions
     """
     patterns = []
+    actor_login = event.actor.login
+    is_bot = actor_login in KNOWN_BOTS
 
-    actor_stats = extractor.get_actor_stats(event.actor.login)
+    actor_stats = extractor.get_actor_stats(actor_login)
 
-    # High velocity (decayed count)
-    if actor_stats["total_events"] > 50:
+    # High velocity (skip for bots - they're expected to have high activity)
+    if not is_bot and actor_stats["total_events"] > 50:
         patterns.append(
-            f"High velocity: {actor_stats['total_events']:.1f} decayed events from {event.actor.login}"
+            f"High velocity: {actor_stats['total_events']:.1f} decayed events from {actor_login}"
         )
 
-    # Repo hopping
-    if actor_stats["unique_repos"] > 20:
+    # Repo hopping (skip for bots)
+    if not is_bot and actor_stats["unique_repos"] > 20:
         patterns.append(
             f"Repo hopping: {actor_stats['unique_repos']} different repos"
         )
 
-    # Destructive actions
+    # Destructive actions (ALWAYS flag - these should always alert)
     if event.type in ["DeleteEvent", "DestroyEvent"]:
         patterns.append(f"Destructive action: {event.type}")
 
-    # Security-critical actions
-    if event.type == "MemberEvent":
-        action = event.payload.get("action", "")
-        patterns.append(f"Permission change: {action}")
+    # Security-critical actions (removed from auto-patterns, will be caught by severity logic)
+    # MemberEvent and PublicEvent no longer auto-generate patterns
 
-    if event.type == "PublicEvent":
-        patterns.append("Repository made public")
-
-    # Force push
-    if event.type == "PushEvent" and event.payload.get("forced", False):
-        patterns.append("Force push detected")
-
-    # Large push
-    if event.type == "PushEvent":
-        size = event.payload.get("size", 0)
-        if size > 50:
-            patterns.append(f"Large push: {size} commits")
-
-    # Empty push (potentially malicious)
-    if event.type == "PushEvent" and event.payload.get("size", 0) == 0:
-        patterns.append("Empty push (potential trigger)")
+    # Note: Large push and empty push detection removed because GitHub Events API
+    # does not provide the 'size' field required for detection
 
     return patterns
