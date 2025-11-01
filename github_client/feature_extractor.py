@@ -530,11 +530,15 @@ class GitHubFeatureExtractor:
         # Increment event counter for lazy decay
         self.total_events += 1
 
-        # Extract timestamp from event (created_at is ISO 8601 string)
+        # Extract timestamp from event (created_at is already a datetime object)
         import datetime
-        event_timestamp = datetime.datetime.fromisoformat(
-            event.created_at.replace('Z', '+00:00')
-        ).timestamp()
+        if isinstance(event.created_at, datetime.datetime):
+            event_timestamp = event.created_at.timestamp()
+        else:
+            # Fallback for string timestamps
+            event_timestamp = datetime.datetime.fromisoformat(
+                event.created_at.replace('Z', '+00:00')
+            ).timestamp()
 
         # Preallocate feature array (32 + 64 + 3 + 1 + 64 + 2 + 1 + 32 + 100 + 5 = 304)
         repo_name = event.repo.name

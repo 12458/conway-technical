@@ -185,7 +185,7 @@ class GitHubEventsPoller:
                         )
 
                 except Exception as e:
-                    logger.error(f"Error processing event {event.id}: {e}")
+                    logger.error(f"Error processing event {event.id}: {e}", exc_info=True)
                     await session.rollback()
                     continue
 

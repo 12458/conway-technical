@@ -85,9 +85,13 @@ class StreamingAnomalyDetector:
 
         # Extract timestamp for velocity detection
         import datetime
-        event_timestamp = datetime.datetime.fromisoformat(
-            event.created_at.replace('Z', '+00:00')
-        ).timestamp()
+        if isinstance(event.created_at, datetime.datetime):
+            event_timestamp = event.created_at.timestamp()
+        else:
+            # Fallback for string timestamps
+            event_timestamp = datetime.datetime.fromisoformat(
+                event.created_at.replace('Z', '+00:00')
+            ).timestamp()
 
         # Get velocity-based anomaly score
         velocity_score, is_inhuman_speed, velocity_reason = (
