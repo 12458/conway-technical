@@ -191,13 +191,12 @@ class EnrichedEvent(BaseModel):
         """Compute overall risk level based on enriched data."""
         risk_score = 0
 
-        # Anomaly score contributes to risk
+        # Anomaly score contributes to risk (rebalanced to reduce inflation)
         if self.anomaly_score > 80:
-            risk_score += 3
+            risk_score += 2  # was 3
         elif self.anomaly_score > 60:
-            risk_score += 2
-        elif self.anomaly_score > 40:
-            risk_score += 1
+            risk_score += 1  # was 2
+        # Removed: anomaly_score > 40 tier (was +1)
 
         # Actor profile risk factors
         if self.actor_profile:
@@ -205,8 +204,7 @@ class EnrichedEvent(BaseModel):
                 risk_score += 2
             if not self.actor_profile.is_active_contributor:
                 risk_score += 1
-            if self.actor_profile.is_site_admin:
-                risk_score += 2  # Admin actions are higher risk
+            # Removed: is_site_admin bonus (was +2) - admin status is not inherently risky
 
         # Repository context risk factors
         if self.repository_context:
@@ -223,15 +221,15 @@ class EnrichedEvent(BaseModel):
         if self.commit_verification and self.commit_verification.is_large_commit:
             risk_score += 1
 
-        # Pattern risk
+        # Pattern risk (destructive patterns are weighted higher)
         risk_score += len(self.suspicious_patterns)
 
-        # Convert score to risk level
-        if risk_score >= 10:
+        # Convert score to risk level (adjusted thresholds to reduce false positives)
+        if risk_score >= 12:
             return "CRITICAL"
-        elif risk_score >= 7:
+        elif risk_score >= 8:
             return "HIGH"
-        elif risk_score >= 4:
+        elif risk_score >= 5:
             return "MEDIUM"
         else:
             return "LOW"
