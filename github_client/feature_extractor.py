@@ -145,7 +145,6 @@ class GitHubFeatureExtractor:
         self.repo_actors = OrderedDict()  # repo -> set of actors
 
         # Time-based velocity tracking (for inhuman speed detection)
-        from collections import deque
         self.actor_timestamps = OrderedDict()  # actor -> deque of timestamps
         self.actor_last_event_time = {}  # actor -> last event timestamp
 
