@@ -20,6 +20,11 @@ from service.database import Base
 logger = logging.getLogger(__name__)
 
 
+def utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
+
+
 class ActorProfileCache(Base):
     """Cache for actor/user profile data from GraphQL."""
 
@@ -29,7 +34,7 @@ class ActorProfileCache(Base):
     login: Mapped[str] = mapped_column(String(100), primary_key=True)
 
     # Profile data
-    account_created_at: Mapped[datetime] = mapped_column(DateTime)
+    account_created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     account_age_days: Mapped[int] = mapped_column(Integer)
     follower_count: Mapped[int] = mapped_column(Integer)
     following_count: Mapped[int] = mapped_column(Integer)
@@ -44,7 +49,7 @@ class ActorProfileCache(Base):
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Cache metadata
-    cached_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
 
     def to_model(self) -> ActorProfile:
         """Convert to ActorProfile model."""
@@ -111,7 +116,7 @@ class RepositoryContextCache(Base):
     license_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Cache metadata
-    cached_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
 
     def to_model(self) -> RepositoryContext:
         """Convert to RepositoryContext model."""
@@ -171,7 +176,7 @@ class WorkflowStatusCache(Base):
     overall_conclusion: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Cache metadata
-    cached_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
 
     def to_model(self) -> WorkflowStatus:
         """Convert to WorkflowStatus model."""
@@ -224,7 +229,7 @@ class CommitVerificationCache(Base):
     author_email: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # Cache metadata (commits are immutable, so cache never expires)
-    cached_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
 
     def to_model(self) -> CommitVerification:
         """Convert to CommitVerification model."""
@@ -299,7 +304,7 @@ class EnrichmentCacheManager:
             return None
 
         # Check TTL
-        if datetime.utcnow() - cached.cached_at > self.ACTOR_PROFILE_TTL:
+        if utc_now() - cached.cached_at > self.ACTOR_PROFILE_TTL:
             logger.debug(f"Actor profile cache expired for {login}")
             self._cache_misses += 1
             return None
@@ -342,7 +347,7 @@ class EnrichmentCacheManager:
             return None
 
         # Check TTL
-        if datetime.utcnow() - cached.cached_at > self.REPOSITORY_CONTEXT_TTL:
+        if utc_now() - cached.cached_at > self.REPOSITORY_CONTEXT_TTL:
             logger.debug(f"Repository context cache expired for {owner}/{name}")
             self._cache_misses += 1
             return None
@@ -385,7 +390,7 @@ class EnrichmentCacheManager:
             return None
 
         # Check TTL
-        if datetime.utcnow() - cached.cached_at > self.WORKFLOW_STATUS_TTL:
+        if utc_now() - cached.cached_at > self.WORKFLOW_STATUS_TTL:
             logger.debug(f"Workflow status cache expired for {repository}@{commit_sha}")
             self._cache_misses += 1
             return None
@@ -448,7 +453,7 @@ class EnrichmentCacheManager:
             Number of entries removed
         """
         count = 0
-        now = datetime.utcnow()
+        now = utc_now()
 
         # Clean up actor profiles
         expired_actors = select(ActorProfileCache).where(

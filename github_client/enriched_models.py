@@ -187,54 +187,6 @@ class EnrichedEvent(BaseModel):
     )
 
     @property
-    def risk_level(self) -> str:
-        """Compute overall risk level based on enriched data."""
-        risk_score = 0
-
-        # Anomaly score contributes to risk (rebalanced to reduce inflation)
-        if self.anomaly_score > 80:
-            risk_score += 2  # was 3
-        elif self.anomaly_score > 60:
-            risk_score += 1  # was 2
-        # Removed: anomaly_score > 40 tier (was +1)
-
-        # Actor profile risk factors
-        if self.actor_profile:
-            if self.actor_profile.is_new_account:
-                risk_score += 2
-            if not self.actor_profile.is_active_contributor:
-                risk_score += 1
-            # Removed: is_site_admin bonus (was +2) - admin status is not inherently risky
-
-        # Repository context risk factors
-        if self.repository_context:
-            if self.repository_context.is_critical:
-                risk_score += 2
-
-        # Workflow status risk factors
-        if self.workflow_status and self.workflow_status.has_failures:
-            risk_score += 2
-
-        # Commit verification risk factors
-        if self.commit_verification and not self.commit_verification.is_verified:
-            risk_score += 1
-        if self.commit_verification and self.commit_verification.is_large_commit:
-            risk_score += 1
-
-        # Pattern risk (destructive patterns are weighted higher)
-        risk_score += len(self.suspicious_patterns)
-
-        # Convert score to risk level (adjusted thresholds to reduce false positives)
-        if risk_score >= 12:
-            return "CRITICAL"
-        elif risk_score >= 8:
-            return "HIGH"
-        elif risk_score >= 5:
-            return "MEDIUM"
-        else:
-            return "LOW"
-
-    @property
     def enrichment_summary(self) -> dict[str, Any]:
         """Summary of enrichment data for logging/alerting."""
         return {
