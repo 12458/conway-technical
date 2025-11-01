@@ -231,7 +231,7 @@ class CommitVerificationCache(Base):
     commit_size: Mapped[int] = mapped_column(Integer, default=0)
 
     # Cache metadata (commits are immutable, so cache never expires)
-    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
 
     def to_model(self) -> CommitVerification:
         """Convert to CommitVerification model."""
