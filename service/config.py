@@ -59,7 +59,7 @@ class ServiceSettings(BaseSettings):
 
     # Anomaly detection settings
     anomaly_threshold: float = Field(
-        default=40.0,
+        default=60.0,
         description="CoDisp score threshold for anomaly detection",
     )
     tree_size: int = Field(

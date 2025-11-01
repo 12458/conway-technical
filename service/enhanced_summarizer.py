@@ -307,6 +307,49 @@ async def _generate_with_openai(context: str) -> dict[str, Any]:
     }
 
 
+def _is_owner_or_maintainer_action(enriched_event: EnrichedEvent) -> bool:
+    """Check if the event is an owner/maintainer performing administrative actions.
+
+    Args:
+        enriched_event: EnrichedEvent with actor and repo data
+
+    Returns:
+        True if this is likely an owner/maintainer administrative action
+    """
+    event = enriched_event.event
+    actor_login = event.actor.login
+    repo_name = event.repo.name
+
+    # Check if actor is the repo owner (owner/repo-name pattern)
+    repo_owner = repo_name.split("/")[0] if "/" in repo_name else ""
+    is_repo_owner = actor_login == repo_owner
+
+    # Check if actor is in the repo's organization (if enrichment available)
+    is_org_member = False
+    if enriched_event.actor_profile and enriched_event.actor_profile.organizations:
+        # Extract org from repo name
+        org_name = repo_owner  # For org repos, owner == org
+        is_org_member = org_name in enriched_event.actor_profile.organizations
+
+    # Define low-risk administrative event types
+    low_risk_admin_types = {
+        "IssuesEvent",  # Issue assignment, labels, etc.
+        "IssueCommentEvent",  # Comments (unless on external PRs)
+    }
+
+    # Check for self-authored PR comments
+    is_self_authored = False
+    if event.type == "IssueCommentEvent":
+        issue = event.payload.get("issue", {})
+        issue_user = issue.get("user", {})
+        if issue_user.get("login") == actor_login:
+            is_self_authored = True
+
+    return (is_repo_owner or is_org_member) and (
+        event.type in low_risk_admin_types or is_self_authored
+    )
+
+
 def _compute_final_severity(ai_severity: str, enriched_event: EnrichedEvent) -> str:
     """Compute final severity considering both AI assessment and enrichment data.
 
@@ -327,12 +370,27 @@ def _compute_final_severity(ai_severity: str, enriched_event: EnrichedEvent) -> 
     # Take the maximum (most severe)
     final_score = max(ai_score, risk_score)
 
-    # Additional escalation rules
-    if enriched_event.actor_profile and enriched_event.actor_profile.is_site_admin:
-        final_score = max(final_score, 3)  # At least HIGH for admin actions
+    # Downweight owner/maintainer administrative actions
+    if _is_owner_or_maintainer_action(enriched_event):
+        # Cap severity at MEDIUM for benign admin actions
+        final_score = min(final_score, 2)
+
+    # Anomaly score correlation (prevent miscalibration)
+    # Low anomaly scores should not result in HIGH/CRITICAL severity
+    if enriched_event.anomaly_score < 50:
+        final_score = min(final_score, 2)  # Cap at MEDIUM
+    # Very high anomaly scores should be at least MEDIUM
+    if enriched_event.anomaly_score > 100:
+        final_score = max(final_score, 2)  # Floor at MEDIUM
+
+    # Additional escalation rules (removed site_admin auto-escalation)
+    # Site admin actions are not inherently risky - rely on other signals
 
     if enriched_event.repository_context and enriched_event.repository_context.is_critical:
-        final_score = max(final_score, 3)  # At least HIGH for critical repos
+        # Critical repos warrant higher scrutiny, but not automatic escalation
+        # Only escalate if there are other risk signals
+        if len(enriched_event.suspicious_patterns) > 0:
+            final_score = max(final_score, 3)  # At least HIGH for critical repos with patterns
 
     if (
         enriched_event.commit_verification

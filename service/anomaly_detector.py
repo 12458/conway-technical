@@ -127,8 +127,9 @@ class StreamingAnomalyDetector:
         Returns:
             True if score exceeds threshold OR critical patterns detected
         """
-        # Always flag if critical patterns detected
-        critical_keywords = ["Permission change", "Repository made public", "Force push"]
+        # Always flag if critical patterns detected (destructive actions only)
+        # Note: "Large push" removed because GitHub Events API doesn't provide size field
+        critical_keywords = ["Destructive action"]
         has_critical_pattern = any(
             any(keyword in pattern for keyword in critical_keywords)
             for pattern in patterns
