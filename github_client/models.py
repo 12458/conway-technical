@@ -217,16 +217,18 @@ class WatchEventPayload(BaseModel):
 
 
 class PushEventPayload(BaseModel):
-    """Payload for PushEvent (commits pushed)."""
+    """Payload for PushEvent (commits pushed).
+
+    Note: The GitHub public Events API only provides repository_id, push_id, ref,
+    head, and before.
+    Those fields require separate API calls to the Commits endpoint.
+    """
 
     repository_id: int = Field(description="Repository ID")
     push_id: int = Field(description="Unique push ID")
     ref: str = Field(description="Git reference (e.g., refs/heads/main)")
     head: str = Field(description="SHA of the HEAD commit after push")
     before: str = Field(description="SHA of the commit before push")
-    size: int | None = Field(None, description="Number of commits in the push")
-    distinct_size: int | None = Field(None, description="Number of distinct commits")
-    commits: list[Commit] | None = Field(None, description="List of commits in the push")
 
 
 class CreateEventPayload(BaseModel):
