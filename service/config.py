@@ -89,6 +89,50 @@ class ServiceSettings(BaseSettings):
         description="Maximum number of timestamps to store per actor (memory limit)",
     )
 
+    # Event-type-specific RRCF forest settings
+    enable_multi_forest: bool = Field(
+        default=True,
+        description="Enable separate RRCF forests per event type group",
+    )
+    event_type_forest_groups: dict[str, list[str]] = Field(
+        default={
+            "push": ["PushEvent"],
+            "pull_request": ["PullRequestEvent", "PullRequestReviewEvent", "PullRequestReviewCommentEvent"],
+            "issues": ["IssuesEvent", "IssueCommentEvent"],
+            "security": ["MemberEvent", "DeleteEvent", "PublicEvent"],
+            "other": [
+                "WatchEvent",
+                "ForkEvent",
+                "CreateEvent",
+                "ReleaseEvent",
+                "GollumEvent",
+                "CommitCommentEvent",
+                "DiscussionEvent",
+            ],
+        },
+        description="Event type grouping for separate RRCF forests. Each group gets its own forest.",
+    )
+
+    # Temporal burst detection settings
+    burst_window_seconds: int = Field(
+        default=30,
+        description="Time window in seconds for burst detection (default: 30 seconds)",
+    )
+    burst_threshold_events: int = Field(
+        default=5,
+        description="Minimum events in burst window to count as burst",
+    )
+    burst_tracking_window: int = Field(
+        default=3600,
+        description="How far back to track bursts in seconds (default: 1 hour)",
+    )
+
+    # Repo hopping time window
+    repo_hopping_time_window: int = Field(
+        default=300,
+        description="Time window in seconds for repo hopping detection (default: 5 minutes)",
+    )
+
     # Queue settings
     queue_name: str = Field(
         default="github-anomalies",

@@ -148,6 +148,10 @@ class GitHubFeatureExtractor:
         self.actor_timestamps = OrderedDict()  # actor -> deque of timestamps
         self.actor_last_event_time = {}  # actor -> last event timestamp
 
+        # Temporal burst tracking (for bot/spam detection)
+        self.actor_bursts = OrderedDict()  # actor -> list of (timestamp, event_count) tuples
+        self.actor_repos_windowed = OrderedDict()  # actor -> deque of (timestamp, repo) tuples for time-windowed repo hopping
+
         # Event counter for lazy decay
         self.total_events = 0
 
@@ -180,6 +184,8 @@ class GitHubFeatureExtractor:
             self.actor_event_types.pop(oldest_actor, None)
             self.actor_timestamps.pop(oldest_actor, None)
             self.actor_last_event_time.pop(oldest_actor, None)
+            self.actor_bursts.pop(oldest_actor, None)
+            self.actor_repos_windowed.pop(oldest_actor, None)
 
     def _evict_lru_repos(self) -> None:
         """Evict oldest repo if limit exceeded."""
@@ -500,13 +506,193 @@ class GitHubFeatureExtractor:
 
         return (velocity_score, is_inhuman, reason)
 
+    def _update_burst_tracking(self, actor_login: str, current_timestamp: float) -> None:
+        """Update burst tracking for an actor.
+
+        Detects bursts of activity (multiple events in short time windows) which
+        are characteristic of automated/bot behavior.
+
+        Args:
+            actor_login: Actor username
+            current_timestamp: Current event timestamp
+        """
+        from service.config import service_settings
+
+        # Initialize burst list if needed
+        if actor_login not in self.actor_bursts:
+            self.actor_bursts[actor_login] = []
+
+        # Get timestamps for burst detection
+        if actor_login not in self.actor_timestamps:
+            return
+
+        timestamps = list(self.actor_timestamps[actor_login])
+        if len(timestamps) < 2:
+            return
+
+        # Define burst window
+        burst_window = service_settings.burst_window_seconds
+        burst_threshold = service_settings.burst_threshold_events
+        burst_cutoff = current_timestamp - burst_window
+
+        # Count events in burst window
+        events_in_burst_window = [ts for ts in timestamps if ts >= burst_cutoff]
+
+        # If burst detected, record it
+        if len(events_in_burst_window) >= burst_threshold:
+            # Check if this is a new burst (not a continuation of previous)
+            bursts = self.actor_bursts[actor_login]
+            if not bursts or (current_timestamp - bursts[-1][0]) > burst_window:
+                # New burst - record it
+                self.actor_bursts[actor_login].append(
+                    (current_timestamp, len(events_in_burst_window))
+                )
+
+        # Clean up old bursts beyond tracking window
+        tracking_window = service_settings.burst_tracking_window
+        tracking_cutoff = current_timestamp - tracking_window
+        self.actor_bursts[actor_login] = [
+            (ts, count)
+            for ts, count in self.actor_bursts[actor_login]
+            if ts >= tracking_cutoff
+        ]
+
+        # Move to end for LRU
+        if actor_login in self.actor_bursts:
+            self.actor_bursts.move_to_end(actor_login)
+
+    def _update_repo_hopping_tracking(
+        self, actor_login: str, repo_name: str, current_timestamp: float
+    ) -> None:
+        """Update time-windowed repo hopping tracking for an actor.
+
+        Args:
+            actor_login: Actor username
+            repo_name: Repository name
+            current_timestamp: Current event timestamp
+        """
+        from collections import deque
+        from service.config import service_settings
+
+        # Initialize deque if needed
+        if actor_login not in self.actor_repos_windowed:
+            self.actor_repos_windowed[actor_login] = deque(maxlen=500)  # Limit per actor
+
+        # Add current repo-timestamp pair
+        self.actor_repos_windowed[actor_login].append((current_timestamp, repo_name))
+
+        # Move to end for LRU
+        if actor_login in self.actor_repos_windowed:
+            self.actor_repos_windowed.move_to_end(actor_login)
+
+        # Clean up old entries outside time window
+        time_window = service_settings.repo_hopping_time_window
+        cutoff_time = current_timestamp - time_window
+        repos_deque = self.actor_repos_windowed[actor_login]
+
+        # Remove timestamps older than time window (from left side)
+        while repos_deque and repos_deque[0][0] < cutoff_time:
+            repos_deque.popleft()
+
+    def get_temporal_burst_features(
+        self, actor_login: str, current_timestamp: float
+    ) -> np.ndarray:
+        """Calculate temporal burst features for an actor.
+
+        Returns 3 features:
+        1. Burst count in tracking window (1 hour by default)
+        2. Silence ratio (time idle / total time)
+        3. Inter-event time coefficient of variation (CV) - low CV = robotic
+
+        Args:
+            actor_login: Actor username
+            current_timestamp: Current event timestamp
+
+        Returns:
+            Numpy array of 3 burst features
+        """
+        from service.config import service_settings
+
+        features = np.zeros(3, dtype=float)
+
+        if actor_login not in self.actor_timestamps:
+            return features
+
+        timestamps = list(self.actor_timestamps[actor_login])
+        if not timestamps:
+            return features
+
+        # Feature 1: Burst count in tracking window
+        if actor_login in self.actor_bursts:
+            bursts = self.actor_bursts[actor_login]
+            tracking_window = service_settings.burst_tracking_window
+            cutoff_time = current_timestamp - tracking_window
+            recent_bursts = [ts for ts, _ in bursts if ts >= cutoff_time]
+            features[0] = len(recent_bursts)
+
+        # Features 2-3: Require at least 2 events
+        if len(timestamps) >= 2:
+            # Calculate inter-event times
+            deltas = [timestamps[i] - timestamps[i - 1] for i in range(1, len(timestamps))]
+
+            # Feature 2: Silence ratio
+            # High silence ratio = long gaps between events (more human-like)
+            # Low silence ratio = constant activity (more bot-like)
+            total_time = timestamps[-1] - timestamps[0]
+            if total_time > 0:
+                # Active time = sum of short inter-event deltas (< 60 seconds)
+                active_threshold = 60.0  # seconds
+                active_time = sum(min(delta, active_threshold) for delta in deltas)
+                idle_time = total_time - active_time
+                features[1] = max(0.0, min(1.0, idle_time / total_time))
+
+            # Feature 3: Coefficient of variation (CV) of inter-event times
+            # Low CV = uniform spacing (robotic)
+            # High CV = variable spacing (human-like)
+            if len(deltas) > 1:
+                mean_delta = np.mean(deltas)
+                if mean_delta > 0:
+                    std_delta = np.std(deltas)
+                    cv = std_delta / mean_delta
+                    # Normalize CV to [0, 1] range (typical CV for humans is 0.5-2.0)
+                    features[2] = min(cv / 2.0, 1.0)
+
+        return features
+
+    def get_repo_hopping_features(
+        self, actor_login: str, current_timestamp: float
+    ) -> int:
+        """Get number of unique repos touched in time window.
+
+        Args:
+            actor_login: Actor username
+            current_timestamp: Current event timestamp
+
+        Returns:
+            Number of unique repos in time window
+        """
+        from service.config import service_settings
+
+        if actor_login not in self.actor_repos_windowed:
+            return 0
+
+        time_window = service_settings.repo_hopping_time_window
+        cutoff_time = current_timestamp - time_window
+
+        # Get repos in time window
+        repos_in_window = set()
+        for ts, repo in self.actor_repos_windowed[actor_login]:
+            if ts >= cutoff_time:
+                repos_in_window.add(repo)
+
+        return len(repos_in_window)
+
     def extract_features(self, event: Event) -> np.ndarray | None:
         """Extract RRCF-optimized feature vector from a GitHub event.
 
-        Features (fixed length 304):
-        - 32: Event type (one-hot hash)
+        Features (fixed length 276):
         - 64: Actor login (one-hot hash)
-        - 3: Actor behavior (decayed count, unique repos, actor ID pattern)
+        - 4: Actor behavior (decayed count, all-time unique repos, windowed unique repos, actor ID pattern)
         - 1: Actor login entropy (randomness indicator for bot/spam detection)
         - 64: Repo name (one-hot hash)
         - 2: Repo activity (decayed count, unique actors)
@@ -514,6 +700,9 @@ class GitHubFeatureExtractor:
         - 32: Org login (one-hot hash, if present)
         - 100: Event-specific features (hashed actions, text, etc.)
         - 5: Time-based velocity features (events in window, inter-event stats, velocity)
+        - 3: Temporal burst features (burst count, silence ratio, inter-event CV)
+
+        Note: Event type is NOT included in features since forests are separated by event type.
 
         Args:
             event: GitHub Event object from models.py
@@ -541,14 +730,22 @@ class GitHubFeatureExtractor:
                 event.created_at.replace('Z', '+00:00')
             ).timestamp()
 
-        # Preallocate feature array (32 + 64 + 3 + 1 + 64 + 2 + 1 + 32 + 100 + 5 = 304)
+        # Update timestamp tracking for velocity and burst detection
+        self._update_actor_timestamps(actor_login, event_timestamp)
+
+        # Update burst tracking
+        self._update_burst_tracking(actor_login, event_timestamp)
+
+        # Preallocate feature array (64 + 4 + 1 + 64 + 2 + 1 + 32 + 100 + 5 + 3 = 276)
         repo_name = event.repo.name
 
-        # Calculate feature dimensions
+        # Update repo hopping tracking
+        self._update_repo_hopping_tracking(actor_login, repo_name, event_timestamp)
+
+        # Calculate feature dimensions (removed 32-dim event type hash)
         feature_size = (
-            self.categorical_dims["event_type"]  # 32
-            + self.categorical_dims["actor"]  # 64
-            + 3  # actor behavior
+            self.categorical_dims["actor"]  # 64
+            + 4  # actor behavior (added windowed repo hopping)
             + 1  # actor entropy
             + self.categorical_dims["repo"]  # 64
             + 2  # repo activity
@@ -556,16 +753,10 @@ class GitHubFeatureExtractor:
             + self.categorical_dims["org"]  # 32
             + 100  # type-specific features
             + 5  # time-based velocity features
+            + 3  # temporal burst features
         )
         features = np.zeros(feature_size, dtype=float)
         idx = 0
-
-        # === EVENT TYPE (32, one-hot hash) ===
-        event_type_vec = self._hash_categorical(
-            event.type, self.categorical_dims["event_type"], seed=1
-        )
-        features[idx : idx + len(event_type_vec)] = event_type_vec
-        idx += len(event_type_vec)
 
         # === ACTOR FEATURES ===
         # One-hot hash (64)
@@ -602,14 +793,12 @@ class GitHubFeatureExtractor:
         # Evict LRU if needed
         self._evict_lru_actors()
 
-        # Update timestamp tracking for velocity detection
-        self._update_actor_timestamps(actor_login, event_timestamp)
-
-        # Actor behavioral features (3)
+        # Actor behavioral features (4)
         features[idx] = decayed_count + 1.0  # Current decayed count
-        features[idx + 1] = len(self.actor_repos[actor_login])
-        features[idx + 2] = event.actor.id % 10000
-        idx += 3
+        features[idx + 1] = len(self.actor_repos[actor_login])  # All-time unique repos
+        features[idx + 2] = self.get_repo_hopping_features(actor_login, event_timestamp)  # Windowed unique repos
+        features[idx + 3] = event.actor.id % 10000  # Actor ID pattern
+        idx += 4
 
         # Actor entropy (1) - high entropy indicates random/bot-generated names
         features[idx] = self._calculate_entropy(actor_login)
@@ -670,6 +859,11 @@ class GitHubFeatureExtractor:
         # === TIME-BASED VELOCITY FEATURES (5) ===
         time_features = self._get_time_based_features(actor_login, event_timestamp)
         features[idx : idx + len(time_features)] = time_features
+        idx += len(time_features)
+
+        # === TEMPORAL BURST FEATURES (3) ===
+        burst_features = self.get_temporal_burst_features(actor_login, event_timestamp)
+        features[idx : idx + len(burst_features)] = burst_features
 
         # Batch normalization updates (every N events)
         if self.normalize and self.total_events % self.normalization_frequency == 0:
@@ -961,6 +1155,10 @@ class GitHubFeatureExtractor:
         self.actor_last_seen.clear()
         self.actor_repos.clear()
         self.actor_event_types.clear()
+        self.actor_timestamps.clear()
+        self.actor_last_event_time.clear()
+        self.actor_bursts.clear()
+        self.actor_repos_windowed.clear()
         self.repo_event_counts.clear()
         self.repo_last_seen.clear()
         self.repo_actors.clear()
