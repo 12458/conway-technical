@@ -147,11 +147,11 @@ class StreamingAnomalyDetector:
             is_inhuman_speed: Whether velocity-based detection flagged inhuman speed
 
         Returns:
-            True if score exceeds threshold OR inhuman speed
+            True if score exceeds threshold (velocity is tracked but does not bypass score requirement)
         """
-        # Removed critical pattern checking due to false positives
-        # Only use RRCF score and velocity-based detection
-        return score >= self.threshold or is_inhuman_speed
+        # Score threshold is a hard requirement
+        # Velocity detection is tracked for context but does not bypass the threshold
+        return score >= self.threshold
 
     def get_stats(self) -> dict[str, Any]:
         """Get detector statistics.

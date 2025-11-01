@@ -216,11 +216,22 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
             context_parts.append(f"  Signer: {commit.signer_login}")
         context_parts.extend(
             [
-                f"- Changes: +{commit.additions} -{commit.deletions} "
-                f"({commit.changed_files} files) "
+                f"- Commit Size: {commit.commit_size} lines changed "
+                f"(+{commit.additions} -{commit.deletions}, {commit.changed_files} files) "
                 f"{'[LARGE COMMIT]' if commit.is_large_commit else ''}",
             ]
         )
+        # Add entropy information
+        if commit.commit_entropy is not None:
+            entropy_warning = ""
+            if commit.has_high_entropy:
+                entropy_warning = " ⚠️ SUSPICIOUS - POSSIBLE OBFUSCATED CODE"
+            context_parts.append(
+                f"- Code Entropy: {commit.commit_entropy:.2f} "
+                f"({commit.entropy_level}){entropy_warning}"
+            )
+        else:
+            context_parts.append("- Code Entropy: Unable to calculate")
         if commit.author_name:
             context_parts.append(f"- Author: {commit.author_name} <{commit.author_email}>")
         context_parts.append("")
@@ -242,14 +253,17 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
             "",
             "- severity: Choose ONE of: low, medium, high, or critical based on these criteria:",
             "  * CRITICAL: Destructive actions (force push, branch deletion), privilege escalations, ",
-            "    verified security incidents, malicious code injection, compromised credentials",
+            "    verified security incidents, malicious code injection, compromised credentials,",
+            "    HIGH ENTROPY commits (>7.0) indicating obfuscated/malicious code",
             "  * HIGH: Suspicious new accounts (<7 days) performing sensitive actions on critical repos,",
             "    unsigned commits to protected branches, failed CI/CD with security implications,",
-            "    unusual permission changes",
+            "    unusual permission changes, elevated entropy (6.0-7.0) with other suspicious indicators,",
+            "    very large commits (>1000 lines) from untrusted sources",
             "  * MEDIUM: Unusual patterns from established accounts, policy violations, moderate anomaly scores,",
-            "    unsigned commits on standard repos, minor workflow failures, inactive accounts with activity",
+            "    unsigned commits on standard repos, minor workflow failures, inactive accounts with activity,",
+            "    large commits (>500 lines) without other red flags",
             "  * LOW: Benign unusual activity, legitimate owner/maintainer maintenance actions,",
-            "    low anomaly scores (<50), administrative tasks by trusted users",
+            "    low anomaly scores (<50), administrative tasks by trusted users, normal entropy (<6.0)",
             "",
             "- severity_reasoning: 1-2 sentences explaining WHY you chose this severity level",
             "  (reference specific enrichment data: actor profile, repo criticality, patterns detected)",
