@@ -140,8 +140,7 @@ class AnomalySummaryResponse(BaseModel):
         examples=["2025-01-01T12:01:30Z"],
     )
     tags: list[str] = Field(
-        description="Classification and security tags (max 10 tags)",
-        max_length=10,
+        description="Classification and security tags",
         examples=[["security", "malicious-activity", "risk:high"]],
     )
 
