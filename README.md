@@ -164,7 +164,7 @@ graph TD
 #### 1. Configuration System (`service/config.py`)
 - Pydantic-based settings management
 - Environment variable support with `SERVICE_` prefix
-- Redis URL, GitHub token, AI API keys
+- Redis URL, GitHub token, OpenAI API keys
 - Configurable thresholds and parameters
 
 #### 2. Database Layer (`service/database.py`)
@@ -172,7 +172,7 @@ graph TD
 - **GitHubEvent**: Stores all processed events with anomaly scores
 - **AnomalySummary**: Stores AI-generated incident reports
 - **Enrichment cache tables**: Actor, repo, workflow, commit data
-- Support for SQLite (dev) and PostgreSQL (prod)
+- Support for PostgreSQL
 
 #### 3. Message Queue (`service/queue.py`)
 - RQ (Redis Queue) integration
@@ -231,7 +231,7 @@ graph TD
   - Exponential decay for temporal patterns
   - Z-score normalization using Welford's algorithm
 - CoDisp (collusive displacement) scoring
-- Configurable threshold (default: 40.0)
+- Configurable threshold (default: 60.0)
 
 ### Hybrid Detection Pipeline
 
@@ -290,27 +290,43 @@ Cache hit rates typically exceed 70% after warm-up, significantly reducing Graph
 
 #### Risk-Based Severity
 
-Enrichment data influences final severity classification:
+Always choose the **highest** level whose criteria are met. If none apply, default to **Low**.
+Primary factors (in order): **repo criticality/protection → actor trust/age → action type → CI/security signals → commit entropy/size → popularity/consumption → anomaly score**.
 
-- **Critical**: High anomaly score + critical repo (>5000 stars) OR site admin action
-- **High**: New account (<30 days) + unsigned commits on protected branch
-- **Medium**: Moderate anomaly score + failed workflows
-- **Low**: Low anomaly score + no concerning enrichment factors
+- **Critical**
+  - Destructive or confirmed-compromise on **critical/protected** assets:
+    - Force-push/branch deletion on protected branch of a critical repo (e.g., >5k★ or widely consumed)
+    - Verified credential compromise, secret leakage, or confirmed malware/backdoor
+    - Release/package tampering pushed to users
+    - Very high entropy (>7.0) **with corroborating indicators** (e.g., malicious patterns, bypassed checks)
 
+- **High**
+  - Strongly suspicious with elevated blast radius:
+    - **New/untrusted account** (<30 days) performing sensitive actions on important repos
+    - **Unsigned commit to a protected branch** or bypass of required checks
+    - Failing **security** checks (SAST/secret scan) tied to the change
+    - Elevated entropy (6.0–7.0) **plus** another suspicious signal (privilege change, unusual permission edit)
+    - Very large change (>1000 LOC) from untrusted sources on important repos
+
+- **Medium**
+  - Policy violations or unusual patterns with moderate risk:
+    - Unsigned commits to **default branch** on repos of moderate/unknown criticality
+    - Moderate anomaly score with **failed CI/workflows** (non-security)
+    - Activity from inactive/recently reactivated accounts on standard repos
+    - Large changes (>500 LOC) without other red flags
+    - Spammy usernames/repo names within org scope
+
+- **Low**
+  - Benign/low-impact unusual activity with strong mitigations:
+    - Maintenance/admin tasks by **established** maintainers
+    - Unsigned commit to **default branch** on **low-criticality** repo by trusted actor,
+      **small diff** and **normal entropy** (<6.0), no corroborating anomalies
+    - No CI configured and no failing security checks; low popularity/consumption
+    - Low anomaly score with no concerning enrichment factors
+  
 #### Configuration
 
-GraphQL enrichment is **mandatory** and requires a GitHub token:
-
-```bash
-# REQUIRED: GitHub token with appropriate scopes
-SERVICE_GITHUB_GRAPHQL_TOKEN=ghp_xxxxxxxxxxxx  # Requires: repo, read:org, read:user
-
-# Optional: Performance tuning
-SERVICE_ENRICHMENT_BATCH_SIZE=10         # Default: 10
-SERVICE_ENRICHMENT_TIMEOUT_MS=5000       # Default: 5000
-```
-
-**Note:** The service will not start without a valid GraphQL token. Enrichment is always enabled to ensure high-quality security analysis.
+GraphQL enrichment is mandatory and requires a GitHub token with GraphQL access.
 
 ### Real-time Processing
 
