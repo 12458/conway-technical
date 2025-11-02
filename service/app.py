@@ -13,7 +13,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, func, select
 
 from service.anomaly_detector import detector
-from service.database import AnomalySummary, AsyncSessionLocal
+from service.database import AnomalySummary, AsyncSessionLocal, close_database
 from service.poller import poller
 from service.queue import get_queue_stats
 from service.sse_models import AnomalyMessage, ConnectedMessage
@@ -119,6 +119,9 @@ async def lifespan(app: FastAPI):
         await broadcaster_task
     except asyncio.CancelledError:
         pass
+
+    # Close database connections
+    await close_database()
 
     logger.info("Application stopped")
 
