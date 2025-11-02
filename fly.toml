@@ -4,7 +4,7 @@
 #
 
 app = 'conway'
-primary_region = 'iad'
+primary_region = 'ewr'
 
 [build]
 
@@ -49,6 +49,6 @@ primary_region = 'iad'
     path = "/health"
 
 [[vm]]
-  memory = '1gb'
+  memory = '2gb'
   cpu_kind = 'shared'
   cpus = 1
