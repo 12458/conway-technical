@@ -320,6 +320,7 @@ async def _summary_broadcaster():
                     select(AnomalySummary)
                     .where(AnomalySummary.id > last_id)
                     .order_by(AnomalySummary.id)
+                    .options(undefer("*"))
                 )
                 new_summaries = result.scalars().all()
 
