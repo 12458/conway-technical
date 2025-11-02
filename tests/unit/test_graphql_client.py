@@ -1,6 +1,6 @@
 """Comprehensive unit tests for GitHubGraphQLClient.
 
-This test suite aims to increase coverage from 0% to 75%+ by testing:
+Tests include:
 - Shannon entropy calculation
 - Client initialization and lifecycle
 - Rate limit handling
