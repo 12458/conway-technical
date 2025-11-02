@@ -8,7 +8,6 @@ from typing import Any
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from github_client.enriched_models import EnrichedEvent
 from github_client.graphql_client import GitHubGraphQLClient
 from github_client.models import Event
 from service.config import service_settings

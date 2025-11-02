@@ -3,7 +3,6 @@
 import asyncio
 import logging
 import random
-from datetime import datetime
 
 from sqlalchemy import select
 
