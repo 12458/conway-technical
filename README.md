@@ -18,6 +18,7 @@ Real-time anomaly detection and alerting system for GitHub public events using R
 
 A complete background polling service for GitHub Events API with:
 - **RRCF-based streaming anomaly detection** (50 trees, 256 samples each)
+- **Adaptive percentile-based threshold** (98th percentile = top 2% flagged)
 - **GraphQL enrichment pipeline** for enhanced context
 - **AI-powered summarization** using GPT 5 mini
 - **Real-time SSE streaming** for instant UI updates
@@ -26,10 +27,11 @@ A complete background polling service for GitHub Events API with:
 ### Novel Approaches
 
 1. **RRCF for GitHub Events**: First application of Robust Random Cut Forest to GitHub event streams with custom feature engineering optimized for tree-based anomaly detection
-2. **Hybrid Detection Pipeline**: Combines statistical anomaly detection (RRCF) with rule-based pattern matching for higher accuracy
-3. **GraphQL Enrichment**: Post-detection enrichment with actor profiles, repository context, workflow status, and commit verification for risk-based severity escalation
-4. **Bot-Aware Processing**: Intelligent filtering of 60+ known bot accounts to reduce noise by ~40%
-5. **Streaming Architecture**: True online anomaly detection with minimal memory footprint via lazy decay and LRU eviction
+2. **Adaptive Threshold System**: Percentile-based dynamic thresholding that maintains balanced anomaly rate (top 2%) regardless of data distribution, preventing both alert storms and silent periods
+3. **Hybrid Detection Pipeline**: Combines statistical anomaly detection (RRCF) with rule-based pattern matching for higher accuracy
+4. **GraphQL Enrichment**: Post-detection enrichment with actor profiles, repository context, workflow status, and commit verification for risk-based severity escalation
+5. **Bot-Aware Processing**: Intelligent filtering of 60+ known bot accounts to reduce noise by ~40%
+6. **Streaming Architecture**: True online anomaly detection with minimal memory footprint via lazy decay and LRU eviction
 
 ---
 
@@ -39,10 +41,9 @@ A complete background polling service for GitHub Events API with:
 - Python 3.12+
 - Redis URL
 - OpenAI API key
-- GitHub token (optional, for higher rate limits)
-- **GitHub GraphQL token (REQUIRED)** - See configuration section below
+- GitHub token
 
-### Setup (5 minutes)
+### Setup
 
 #### 1. Install Dependencies
 ```bash
