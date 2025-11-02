@@ -49,7 +49,9 @@ class ActorProfileCache(Base):
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Cache metadata
-    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    cached_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
 
     def to_model(self) -> ActorProfile:
         """Convert to ActorProfile model."""
@@ -116,7 +118,9 @@ class RepositoryContextCache(Base):
     license_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Cache metadata
-    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    cached_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
 
     def to_model(self) -> RepositoryContext:
         """Convert to RepositoryContext model."""
@@ -176,7 +180,9 @@ class WorkflowStatusCache(Base):
     overall_conclusion: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Cache metadata
-    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    cached_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
 
     def to_model(self) -> WorkflowStatus:
         """Convert to WorkflowStatus model."""
@@ -231,7 +237,9 @@ class CommitVerificationCache(Base):
     commit_size: Mapped[int] = mapped_column(Integer, default=0)
 
     # Cache metadata (commits are immutable, so cache never expires)
-    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    cached_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
 
     def to_model(self) -> CommitVerification:
         """Convert to CommitVerification model."""
@@ -413,7 +421,9 @@ class EnrichmentCacheManager:
         cached = WorkflowStatusCache.from_model(status)
         await self.session.merge(cached)
         await self.session.commit()
-        logger.debug(f"Cached workflow status for {status.repository}@{status.commit_sha}")
+        logger.debug(
+            f"Cached workflow status for {status.repository}@{status.commit_sha}"
+        )
 
     async def get_commit_verification(
         self, repository: str, sha: str
@@ -450,7 +460,9 @@ class EnrichmentCacheManager:
         cached = CommitVerificationCache.from_model(verification)
         await self.session.merge(cached)
         await self.session.commit()
-        logger.debug(f"Cached commit verification for {verification.repository}@{verification.sha}")
+        logger.debug(
+            f"Cached commit verification for {verification.repository}@{verification.sha}"
+        )
 
     async def cleanup_expired(self) -> int:
         """Remove expired cache entries.

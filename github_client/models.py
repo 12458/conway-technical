@@ -130,7 +130,9 @@ class Review(BaseModel):
     id: int = Field(description="Review ID")
     body: str | None = Field(None, description="Review comment text")
     user: User = Field(description="User who created the review")
-    state: str = Field(description="Review state (APPROVED, CHANGES_REQUESTED, COMMENTED)")
+    state: str = Field(
+        description="Review state (APPROVED, CHANGES_REQUESTED, COMMENTED)"
+    )
     commit_id: str = Field(description="SHA of the commit being reviewed")
     url: HttpUrl = Field(description="API URL for the review")
     html_url: HttpUrl = Field(description="Web URL for the review")
@@ -192,7 +194,9 @@ class WikiPage(BaseModel):
     page_name: str = Field(description="Page name")
     title: str = Field(description="Page title")
     summary: str | None = Field(None, description="Optional page summary")
-    action: Literal["created", "edited"] = Field(description="Action performed on the page")
+    action: Literal["created", "edited"] = Field(
+        description="Action performed on the page"
+    )
     sha: str = Field(description="Latest commit SHA of the page")
     html_url: HttpUrl = Field(description="Web URL for the wiki page")
 
@@ -234,7 +238,9 @@ class PushEventPayload(BaseModel):
 class CreateEventPayload(BaseModel):
     """Payload for CreateEvent (branch or tag created)."""
 
-    ref: str | None = Field(None, description="Git ref name (branch or null if repository)")
+    ref: str | None = Field(
+        None, description="Git ref name (branch or null if repository)"
+    )
     ref_type: Literal["branch", "tag", "repository"] = Field(
         description="Type of ref created"
     )
@@ -243,7 +249,9 @@ class CreateEventPayload(BaseModel):
     )
     master_branch: str | None = Field(None, description="Default branch name")
     description: str | None = Field(None, description="Repository description")
-    pusher_type: str | None = Field(None, description="Type of pusher (user/deploy key)")
+    pusher_type: str | None = Field(
+        None, description="Type of pusher (user/deploy key)"
+    )
 
 
 class DeleteEventPayload(BaseModel):
@@ -279,7 +287,9 @@ class IssuesEventPayload(BaseModel):
         "unlabeled",
     ] = Field(description="Action performed on the issue")
     issue: Issue = Field(description="The issue")
-    assignee: User | None = Field(None, description="User assigned/unassigned (if applicable)")
+    assignee: User | None = Field(
+        None, description="User assigned/unassigned (if applicable)"
+    )
     assignees: list[User] | None = Field(
         None, description="Array of assignee objects (if applicable)"
     )
@@ -305,7 +315,9 @@ class PullRequestEventPayload(BaseModel):
     ] = Field(description="Action performed on the pull request")
     number: int = Field(description="Pull request number")
     pull_request: PullRequest = Field(description="The pull request")
-    assignee: User | None = Field(None, description="User assigned/unassigned (if applicable)")
+    assignee: User | None = Field(
+        None, description="User assigned/unassigned (if applicable)"
+    )
     assignees: list[User] | None = Field(
         None, description="Array of assignee objects (if applicable)"
     )
@@ -373,7 +385,9 @@ class PullRequestReviewEventPayload(BaseModel):
     action: Literal["created", "edited", "dismissed"] = Field(
         description="Action performed on the review"
     )
-    pull_request: PullRequest = Field(description="The pull request the review pertains to")
+    pull_request: PullRequest = Field(
+        description="The pull request the review pertains to"
+    )
     review: Review = Field(description="The review that was affected")
 
 
@@ -381,7 +395,9 @@ class PullRequestReviewCommentEventPayload(BaseModel):
     """Payload for PullRequestReviewCommentEvent."""
 
     action: Literal["created"] = Field(description="Action performed on the comment")
-    pull_request: PullRequest = Field(description="The pull request the comment belongs to")
+    pull_request: PullRequest = Field(
+        description="The pull request the comment belongs to"
+    )
     comment: Comment = Field(description="The comment itself")
 
 
@@ -426,14 +442,10 @@ class Event(BaseModel):
     type: str = Field(description="Event type (e.g., WatchEvent, PushEvent)")
     actor: Actor = Field(description="User who triggered the event")
     repo: Repo = Field(description="Repository where event occurred")
-    payload: dict[str, Any] = Field(
-        description="Event payload (varies by event type)"
-    )
+    payload: dict[str, Any] = Field(description="Event payload (varies by event type)")
     public: bool = Field(description="Whether the event is public")
     created_at: datetime = Field(description="Event creation timestamp")
-    org: Organization | None = Field(
-        None, description="Organization (if applicable)"
-    )
+    org: Organization | None = Field(None, description="Organization (if applicable)")
 
     model_config = {"extra": "forbid"}
 

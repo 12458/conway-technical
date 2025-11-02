@@ -426,9 +426,7 @@ def sample_gharchive_file(
 
 
 @pytest.fixture
-def sample_gharchive_file_with_invalid_events(
-    tmp_path, sample_watch_event_data
-):
+def sample_gharchive_file_with_invalid_events(tmp_path, sample_watch_event_data):
     """Create a GH Archive file with both valid and invalid events.
 
     This fixture creates a file containing:

@@ -75,9 +75,7 @@ class EnrichmentService:
 
         # Enrich actor profile (always relevant)
         try:
-            enriched.actor_profile = await self._enrich_actor_profile(
-                event.actor.login
-            )
+            enriched.actor_profile = await self._enrich_actor_profile(event.actor.login)
         except Exception as e:
             logger.error(f"Failed to enrich actor profile: {e}")
             self._error_count += 1
@@ -169,9 +167,7 @@ class EnrichmentService:
 
         return context
 
-    async def _enrich_push_event(
-        self, event: Event, enriched: EnrichedEvent
-    ) -> None:
+    async def _enrich_push_event(self, event: Event, enriched: EnrichedEvent) -> None:
         """Enrich PushEvent with workflow status and commit verification.
 
         Args:

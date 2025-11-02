@@ -12,6 +12,7 @@ from alembic import context
 
 # Load environment variables
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # this is the Alembic Config object, which provides
@@ -53,12 +54,13 @@ if database_url.startswith("postgresql://"):
     # asyncpg doesn't support sslmode or channel_binding query params, use ssl=require instead
     if "sslmode=" in database_url:
         import re
+
         # Remove sslmode and channel_binding params, add ssl=require
-        database_url = re.sub(r'[&?]sslmode=[^&]*', '', database_url)
-        database_url = re.sub(r'[&?]channel_binding=[^&]*', '', database_url)
+        database_url = re.sub(r"[&?]sslmode=[^&]*", "", database_url)
+        database_url = re.sub(r"[&?]channel_binding=[^&]*", "", database_url)
         # Add ssl=require
-        separator = '&' if '?' in database_url else '?'
-        database_url = database_url + separator + 'ssl=require'
+        separator = "&" if "?" in database_url else "?"
+        database_url = database_url + separator + "ssl=require"
 elif database_url.startswith("sqlite"):
     database_url = database_url.replace("sqlite", "sqlite+aiosqlite", 1)
 

@@ -40,7 +40,9 @@ def analyze_archive(archive_path: str) -> None:
     file_info = loader.get_file_info()
     print("\nFile Information:")
     print(f"  Name: {file_info['file_name']}")
-    print(f"  Size: {file_info['file_size_mb']} MB ({file_info['file_size_bytes']:,} bytes)")
+    print(
+        f"  Size: {file_info['file_size_mb']} MB ({file_info['file_size_bytes']:,} bytes)"
+    )
 
     # Initialize counters
     event_type_counter = Counter()
@@ -215,6 +217,7 @@ def main() -> None:
     except Exception as e:
         print(f"\n\nError during analysis: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

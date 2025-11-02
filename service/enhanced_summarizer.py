@@ -233,7 +233,9 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
         else:
             context_parts.append("- Code Entropy: Unable to calculate")
         if commit.author_name:
-            context_parts.append(f"- Author: {commit.author_name} <{commit.author_email}>")
+            context_parts.append(
+                f"- Author: {commit.author_name} <{commit.author_email}>"
+            )
         context_parts.append("")
 
     # Event payload (truncated)

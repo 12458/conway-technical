@@ -93,9 +93,7 @@ async def summarize_anomaly_job(
                     # Use enhanced summarization
                     result = await summarize_enriched_anomaly(enriched_event)
 
-                    logger.info(
-                        f"Enrichment stats: {enrichment_service.stats}"
-                    )
+                    logger.info(f"Enrichment stats: {enrichment_service.stats}")
 
                     return result
 
@@ -118,8 +116,16 @@ async def summarize_anomaly_job(
             # Save to database
             # Extract fields from Event format
             event_type = event_data.get("type")
-            actor_login = event_data.get("actor", {}).get("login") if isinstance(event_data.get("actor"), dict) else "unknown"
-            repo_name = event_data.get("repo", {}).get("name") if isinstance(event_data.get("repo"), dict) else "unknown"
+            actor_login = (
+                event_data.get("actor", {}).get("login")
+                if isinstance(event_data.get("actor"), dict)
+                else "unknown"
+            )
+            repo_name = (
+                event_data.get("repo", {}).get("name")
+                if isinstance(event_data.get("repo"), dict)
+                else "unknown"
+            )
 
             async with AsyncSessionLocal() as session:
                 db_summary = AnomalySummary(
@@ -181,7 +187,9 @@ async def generate_summary(
         return await _generate_with_openai(context)
     else:
         # Fallback to rule-based summary
-        logger.warning(f"Unsupported AI provider: {service_settings.ai_provider}, using fallback")
+        logger.warning(
+            f"Unsupported AI provider: {service_settings.ai_provider}, using fallback"
+        )
         raise Exception("Unsupported AI provider")
 
 
@@ -204,15 +212,23 @@ def _build_summary_context(
 
     # Extract fields from Event format
     event_type = event_data.get("type")
-    actor_login = event_data.get("actor", {}).get("login") if isinstance(event_data.get("actor"), dict) else None
-    repo_name = event_data.get("repo", {}).get("name") if isinstance(event_data.get("repo"), dict) else None
+    actor_login = (
+        event_data.get("actor", {}).get("login")
+        if isinstance(event_data.get("actor"), dict)
+        else None
+    )
+    repo_name = (
+        event_data.get("repo", {}).get("name")
+        if isinstance(event_data.get("repo"), dict)
+        else None
+    )
 
     context = f"""Analyze this GitHub security incident and provide a structured assessment.
 
 Event Type: {event_type}
 Actor: {actor_login}
 Repository: {repo_name}
-Timestamp: {event_data['created_at']}
+Timestamp: {event_data["created_at"]}
 
 Suspicious Patterns Detected:
 {chr(10).join(f"- {pattern}" for pattern in suspicious_patterns) if suspicious_patterns else "- None"}

@@ -97,7 +97,11 @@ class ServiceSettings(BaseSettings):
     event_type_forest_groups: dict[str, list[str]] = Field(
         default={
             "push": ["PushEvent"],
-            "pull_request": ["PullRequestEvent", "PullRequestReviewEvent", "PullRequestReviewCommentEvent"],
+            "pull_request": [
+                "PullRequestEvent",
+                "PullRequestReviewEvent",
+                "PullRequestReviewCommentEvent",
+            ],
             "issues": ["IssuesEvent", "IssueCommentEvent"],
             "security": ["MemberEvent", "DeleteEvent", "PublicEvent"],
             "other": [

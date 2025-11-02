@@ -175,7 +175,11 @@ class TestEventPayloads:
 
     def test_pull_request_event_payload(self, sample_pull_request_data):
         """Test PullRequestEventPayload model."""
-        data = {"action": "opened", "number": 42, "pull_request": sample_pull_request_data}
+        data = {
+            "action": "opened",
+            "number": 42,
+            "pull_request": sample_pull_request_data,
+        }
         payload = PullRequestEventPayload.model_validate(data)
 
         assert payload.action == "opened"
@@ -270,7 +274,9 @@ class TestEventModel:
 class TestEventsResponse:
     """Tests for EventsResponse model."""
 
-    def test_events_response_with_data(self, sample_events_list, mock_etag, mock_poll_interval):
+    def test_events_response_with_data(
+        self, sample_events_list, mock_etag, mock_poll_interval
+    ):
         """Test EventsResponse model with all fields."""
         events = [Event.model_validate(e) for e in sample_events_list]
         response = EventsResponse(
@@ -667,7 +673,9 @@ class TestUpdatedEventPayloads:
         assert payload.assignee.login == "octocat"
         assert payload.label.name == "bug"
 
-    def test_issue_comment_event_with_models(self, sample_issue_data, sample_comment_data):
+    def test_issue_comment_event_with_models(
+        self, sample_issue_data, sample_comment_data
+    ):
         """Test IssueCommentEventPayload with typed models."""
         data = {
             "action": "created",

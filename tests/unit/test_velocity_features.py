@@ -200,7 +200,9 @@ class TestVelocityAnomalyDetection:
 class TestStreamingAnomalyDetectorVelocity:
     """Test velocity integration in StreamingAnomalyDetector."""
 
-    def create_test_event(self, actor_login: str, event_id: str, timestamp: str) -> Event:
+    def create_test_event(
+        self, actor_login: str, event_id: str, timestamp: str
+    ) -> Event:
         """Create a test event with given parameters."""
         return Event(
             id=event_id,

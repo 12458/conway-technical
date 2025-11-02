@@ -89,7 +89,10 @@ class TestRealGitHubAPI:
                 page1_ids = {e.id for e in page1.events}
                 page2_ids = {e.id for e in page2.events}
                 # Pages might overlap due to timing, but usually won't
-                assert page1_ids != page2_ids or len(page1_ids.intersection(page2_ids)) < 10
+                assert (
+                    page1_ids != page2_ids
+                    or len(page1_ids.intersection(page2_ids)) < 10
+                )
 
     @pytest.mark.asyncio
     async def test_different_per_page_values(self):

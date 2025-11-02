@@ -9,7 +9,9 @@ from service.anomaly_detector import MultiForestAnomalyDetector
 from github_client.feature_extractor import GitHubFeatureExtractor
 
 
-def create_test_event(event_type: str, actor_login: str, repo_name: str, created_at: datetime.datetime) -> Event:
+def create_test_event(
+    event_type: str, actor_login: str, repo_name: str, created_at: datetime.datetime
+) -> Event:
     """Create a test event for testing purposes."""
     return Event(
         id=f"test-{event_type}-{actor_login}",
@@ -48,7 +50,9 @@ def test_feature_dimensions():
     assert features is not None, "Feature extraction should not return None"
     # 64 actor + 4 behavior + 1 entropy + 64 repo + 2 repo_activity + 1 repo_entropy + 32 org + 100 type_specific + 5 velocity + 3 burst
     expected_dimensions = 276
-    assert len(features) == expected_dimensions, f"Expected {expected_dimensions} dimensions, got {len(features)}"
+    assert len(features) == expected_dimensions, (
+        f"Expected {expected_dimensions} dimensions, got {len(features)}"
+    )
 
 
 @pytest.mark.unit
@@ -62,7 +66,9 @@ def test_burst_detection():
 
     for i in range(10):
         event_time = base_time + datetime.timedelta(seconds=i * 1.5)
-        event = create_test_event("IssuesEvent", actor, f"owner/repo{i % 3}", event_time)
+        event = create_test_event(
+            "IssuesEvent", actor, f"owner/repo{i % 3}", event_time
+        )
         features = extractor.extract_features(event)
 
     # Get burst features
@@ -93,15 +99,21 @@ def test_repo_hopping():
         features = extractor.extract_features(event)
 
     # Get repo hopping stats
-    last_timestamp = (base_time + datetime.timedelta(seconds=(num_repos - 1) * 4)).timestamp()
+    last_timestamp = (
+        base_time + datetime.timedelta(seconds=(num_repos - 1) * 4)
+    ).timestamp()
     windowed_repos = extractor.get_repo_hopping_features(actor, last_timestamp)
 
     # Get all-time repos from actor_repos
     alltime_repos = len(extractor.actor_repos.get(actor, set()))
 
-    assert alltime_repos == num_repos, f"Expected {num_repos} all-time repos, got {alltime_repos}"
+    assert alltime_repos == num_repos, (
+        f"Expected {num_repos} all-time repos, got {alltime_repos}"
+    )
     assert windowed_repos > 0, "Windowed repos should be positive"
-    assert windowed_repos <= alltime_repos, "Windowed repos should not exceed all-time repos"
+    assert windowed_repos <= alltime_repos, (
+        "Windowed repos should not exceed all-time repos"
+    )
 
 
 @pytest.mark.unit
@@ -123,7 +135,9 @@ def test_multiforest_routing():
 
     for event_type, expected_group in test_cases:
         actual_group = detector._get_forest_group(event_type)
-        assert actual_group == expected_group, f"{event_type} should route to {expected_group}, got {actual_group}"
+        assert actual_group == expected_group, (
+            f"{event_type} should route to {expected_group}, got {actual_group}"
+        )
 
 
 @pytest.mark.unit
@@ -136,15 +150,23 @@ def test_anomaly_scores():
     # Feed 20 push events
     for i in range(20):
         event_time = base_time + datetime.timedelta(seconds=i * 60)
-        event = create_test_event("PushEvent", f"user{i % 5}", f"owner/repo{i % 3}", event_time)
-        score, patterns, features, vel_score, is_inhuman, vel_reason = detector.process_event(event)
+        event = create_test_event(
+            "PushEvent", f"user{i % 5}", f"owner/repo{i % 3}", event_time
+        )
+        score, patterns, features, vel_score, is_inhuman, vel_reason = (
+            detector.process_event(event)
+        )
 
     # Feed 5 issue events from same users
     issue_scores = []
     for i in range(5):
         event_time = base_time + datetime.timedelta(seconds=(20 + i) * 60)
-        event = create_test_event("IssuesEvent", f"user{i}", f"owner/repo{i % 3}", event_time)
-        score, patterns, features, vel_score, is_inhuman, vel_reason = detector.process_event(event)
+        event = create_test_event(
+            "IssuesEvent", f"user{i}", f"owner/repo{i % 3}", event_time
+        )
+        score, patterns, features, vel_score, is_inhuman, vel_reason = (
+            detector.process_event(event)
+        )
         if score is not None:
             issue_scores.append(score)
 
@@ -157,5 +179,5 @@ def test_anomaly_scores():
 
     # Verify forest statistics
     stats = detector.get_stats()
-    assert 'forest_stats' in stats, "Stats should contain forest_stats"
-    assert len(stats['forest_stats']) > 0, "Should have at least one forest with stats"
+    assert "forest_stats" in stats, "Stats should contain forest_stats"
+    assert len(stats["forest_stats"]) > 0, "Should have at least one forest with stats"

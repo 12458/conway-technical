@@ -137,7 +137,9 @@ class GitHubEventsClient:
         request_headers = {}
         if etag:
             # GitHub requires quotes around ETag value
-            request_headers["If-None-Match"] = f'"{etag}"' if not etag.startswith('"') else etag
+            request_headers["If-None-Match"] = (
+                f'"{etag}"' if not etag.startswith('"') else etag
+            )
 
         try:
             response = await client.get(

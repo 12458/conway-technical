@@ -42,8 +42,10 @@ class TestConfiguration:
         """Test that at least one AI API key is configured."""
         # Check for at least one AI key
         # Note: This test will pass even if no key is set, as the service can use fallback summaries
-        has_ai_key = service_settings.anthropic_api_key or service_settings.openai_api_key
+        has_ai_key = (
+            service_settings.anthropic_api_key or service_settings.openai_api_key
+        )
         # We don't assert True here because the service can work without AI keys (fallback mode)
         # Just verify the fields exist
-        assert hasattr(service_settings, 'anthropic_api_key')
-        assert hasattr(service_settings, 'openai_api_key')
+        assert hasattr(service_settings, "anthropic_api_key")
+        assert hasattr(service_settings, "openai_api_key")

@@ -73,9 +73,7 @@ def run_api_server(host: str, port: int):
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="GitHub Anomaly Monitoring Service"
-    )
+    parser = argparse.ArgumentParser(description="GitHub Anomaly Monitoring Service")
     parser.add_argument(
         "--workers",
         type=int,
@@ -120,9 +118,14 @@ def main():
     logger.info("=" * 60)
 
     # Check for required API keys
-    if service_settings.ai_provider == "anthropic" and not service_settings.anthropic_api_key:
+    if (
+        service_settings.ai_provider == "anthropic"
+        and not service_settings.anthropic_api_key
+    ):
         logger.warning("⚠️  Anthropic API key not set - will use fallback summaries")
-    elif service_settings.ai_provider == "openai" and not service_settings.openai_api_key:
+    elif (
+        service_settings.ai_provider == "openai" and not service_settings.openai_api_key
+    ):
         logger.warning("⚠️  OpenAI API key not set - will use fallback summaries")
 
     if not service_settings.github_token:

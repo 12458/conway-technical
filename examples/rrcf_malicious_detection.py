@@ -34,7 +34,9 @@ from github_client.feature_extractor import (
 class RRCFMaliciousEventDetector:
     """RRCF-based detector for malicious GitHub events."""
 
-    def __init__(self, num_trees: int = 40, tree_size: int = 256, filter_bots: bool = True):
+    def __init__(
+        self, num_trees: int = 40, tree_size: int = 256, filter_bots: bool = True
+    ):
         """Initialize the detector.
 
         Args:
@@ -114,7 +116,10 @@ class RRCFMaliciousEventDetector:
 
 
 def analyze_for_malicious_activity(
-    archive_path: str, percentile_threshold: float = 99.0, top_n: int = 20, filter_bots: bool = True
+    archive_path: str,
+    percentile_threshold: float = 99.0,
+    top_n: int = 20,
+    filter_bots: bool = True,
 ) -> None:
     """Analyze archive for malicious events.
 
@@ -131,7 +136,9 @@ def analyze_for_malicious_activity(
 
     # Initialize
     loader = GHArchiveLoader(archive_path, strict=False)
-    detector = RRCFMaliciousEventDetector(num_trees=40, tree_size=256, filter_bots=filter_bots)
+    detector = RRCFMaliciousEventDetector(
+        num_trees=40, tree_size=256, filter_bots=filter_bots
+    )
 
     # Track anomalies
     all_events = []
@@ -170,10 +177,16 @@ def analyze_for_malicious_activity(
 
     print(f"\nProcessed {total_events:,} total events")
     if filter_bots and detector.bots_filtered > 0:
-        print(f"  - {detector.bots_filtered:,} bot events filtered ({detector.bots_filtered/total_events*100:.1f}%)")
-        print(f"  - {processed_events:,} non-bot events analyzed ({processed_events/total_events*100:.1f}%)")
+        print(
+            f"  - {detector.bots_filtered:,} bot events filtered ({detector.bots_filtered / total_events * 100:.1f}%)"
+        )
+        print(
+            f"  - {processed_events:,} non-bot events analyzed ({processed_events / total_events * 100:.1f}%)"
+        )
     print(f"Adaptive threshold: {threshold:.3f}")
-    print(f"Found {len(anomalies):,} anomalies above threshold ({len(anomalies)/processed_events*100:.2f}%)")
+    print(
+        f"Found {len(anomalies):,} anomalies above threshold ({len(anomalies) / processed_events * 100:.2f}%)"
+    )
 
     # Statistics
     scores_array = np.array(detector.all_scores)
@@ -256,7 +269,9 @@ def analyze_for_malicious_activity(
         for actor, count in actors.most_common(10):
             total = detector.feature_extractor.actor_event_counts[actor]
             anomaly_rate = count / total * 100
-            print(f"  {actor:30s} {count:5,} anomalies / {total:5,} total ({anomaly_rate:5.1f}%)")
+            print(
+                f"  {actor:30s} {count:5,} anomalies / {total:5,} total ({anomaly_rate:5.1f}%)"
+            )
 
         # Repos in anomalies
         repos = Counter(e.repo.name for _, e, _ in anomalies)
@@ -270,7 +285,9 @@ def analyze_for_malicious_activity(
             (s, e, f) for s, e, f in anomalies if e.type in critical_types
         ]
         if critical_anomalies:
-            print(f"\n⚠️  SECURITY ALERT: {len(critical_anomalies)} anomalous security-critical events!")
+            print(
+                f"\n⚠️  SECURITY ALERT: {len(critical_anomalies)} anomalous security-critical events!"
+            )
             print("  Event type breakdown:")
             for event_type in critical_types:
                 count = sum(1 for _, e, _ in critical_anomalies if e.type == event_type)

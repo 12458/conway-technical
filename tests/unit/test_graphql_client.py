@@ -111,7 +111,7 @@ class TestGraphQLClientInitialization:
         """Test client connection establishes transport."""
         client = GitHubGraphQLClient("ghp_test_token")
 
-        with patch('github_client.graphql_client.Client') as mock_client_class:
+        with patch("github_client.graphql_client.Client") as mock_client_class:
             mock_client = MagicMock()
             mock_client_class.return_value = mock_client
 
@@ -141,8 +141,8 @@ class TestGraphQLClientInitialization:
         """Test async context manager lifecycle."""
         client = GitHubGraphQLClient("ghp_test_token")
 
-        with patch.object(client, 'connect', new_callable=AsyncMock) as mock_connect:
-            with patch.object(client, 'close', new_callable=AsyncMock) as mock_close:
+        with patch.object(client, "connect", new_callable=AsyncMock) as mock_connect:
+            with patch.object(client, "close", new_callable=AsyncMock) as mock_close:
                 async with client:
                     pass
 
@@ -174,7 +174,7 @@ class TestQueryExecution:
         """Test query execution auto-connects if not connected."""
         client = GitHubGraphQLClient("ghp_test_token")
 
-        with patch.object(client, 'connect', new_callable=AsyncMock) as mock_connect:
+        with patch.object(client, "connect", new_callable=AsyncMock) as mock_connect:
             mock_client = MagicMock()
             mock_client.execute_async = AsyncMock(return_value={})
 
@@ -198,7 +198,7 @@ class TestQueryExecution:
         mock_client.execute_async = AsyncMock(return_value={})
         client._client = mock_client
 
-        with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             await client._execute_query("query { test }", {})
 
             # Should have slept waiting for rate limit
@@ -214,14 +214,11 @@ class TestQueryExecution:
         mock_client = MagicMock()
         # First call fails, second succeeds
         mock_client.execute_async = AsyncMock(
-            side_effect=[
-                TransportQueryError("Temporary error"),
-                {"data": "success"}
-            ]
+            side_effect=[TransportQueryError("Temporary error"), {"data": "success"}]
         )
         client._client = mock_client
 
-        with patch('asyncio.sleep', new_callable=AsyncMock):
+        with patch("asyncio.sleep", new_callable=AsyncMock):
             result = await client._execute_query("query { test }", {}, retries=3)
 
         assert result == {"data": "success"}
@@ -238,7 +235,7 @@ class TestQueryExecution:
         )
         client._client = mock_client
 
-        with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             result = await client._execute_query("query { test }", {}, retries=3)
 
         assert result is None
@@ -251,12 +248,10 @@ class TestQueryExecution:
         client = GitHubGraphQLClient("ghp_test_token")
 
         mock_client = MagicMock()
-        mock_client.execute_async = AsyncMock(
-            side_effect=TransportQueryError("error")
-        )
+        mock_client.execute_async = AsyncMock(side_effect=TransportQueryError("error"))
         client._client = mock_client
 
-        with patch('asyncio.sleep', new_callable=AsyncMock):
+        with patch("asyncio.sleep", new_callable=AsyncMock):
             # First error
             await client._execute_query("query { test }", {}, retries=1)
             assert client._consecutive_errors == 1
@@ -278,7 +273,7 @@ class TestQueryExecution:
         mock_client.execute_async = AsyncMock(side_effect=RuntimeError("Unexpected"))
         client._client = mock_client
 
-        with patch('asyncio.sleep', new_callable=AsyncMock):
+        with patch("asyncio.sleep", new_callable=AsyncMock):
             result = await client._execute_query("query { test }", {}, retries=2)
 
         assert result is None
@@ -318,10 +313,12 @@ class TestActorProfileEnrichment:
             "rateLimit": {
                 "remaining": 4500,
                 "resetAt": "2025-01-01T12:00:00Z",
-            }
+            },
         }
 
-        with patch.object(client, '_execute_query', new_callable=AsyncMock, return_value=mock_result):
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
             profile = await client.get_actor_profile("testuser")
 
         assert profile is not None
@@ -356,7 +353,9 @@ class TestActorProfileEnrichment:
 
         mock_result = {"user": None}
 
-        with patch.object(client, '_execute_query', new_callable=AsyncMock, return_value=mock_result):
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
             profile = await client.get_actor_profile("nonexistent")
 
         assert profile is None
@@ -366,7 +365,9 @@ class TestActorProfileEnrichment:
         """Test handling of query errors."""
         client = GitHubGraphQLClient("ghp_test_token")
 
-        with patch.object(client, '_execute_query', new_callable=AsyncMock, return_value=None):
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=None
+        ):
             profile = await client.get_actor_profile("testuser")
 
         assert profile is None
@@ -392,10 +393,12 @@ class TestActorProfileEnrichment:
                 },
                 "organizations": {"nodes": []},
             },
-            "rateLimit": {"remaining": 5000, "resetAt": "2025-01-01T12:00:00Z"}
+            "rateLimit": {"remaining": 5000, "resetAt": "2025-01-01T12:00:00Z"},
         }
 
-        with patch.object(client, '_execute_query', new_callable=AsyncMock, return_value=mock_result):
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
             profile = await client.get_actor_profile("newuser")
 
         assert profile is not None
@@ -429,10 +432,12 @@ class TestRepositoryContextEnrichment:
                 },
                 "licenseInfo": {"name": "MIT License"},
             },
-            "rateLimit": {"remaining": 4500, "resetAt": "2025-01-01T12:00:00Z"}
+            "rateLimit": {"remaining": 4500, "resetAt": "2025-01-01T12:00:00Z"},
         }
 
-        with patch.object(client, '_execute_query', new_callable=AsyncMock, return_value=mock_result):
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
             context = await client.get_repository_context("owner", "repo")
 
         assert context is not None
@@ -455,7 +460,9 @@ class TestRepositoryContextEnrichment:
 
         mock_result = {"repository": None}
 
-        with patch.object(client, '_execute_query', new_callable=AsyncMock, return_value=mock_result):
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
             context = await client.get_repository_context("owner", "nonexistent")
 
         assert context is None
@@ -478,10 +485,12 @@ class TestRepositoryContextEnrichment:
                 "repositoryTopics": {"nodes": []},
                 "licenseInfo": None,
             },
-            "rateLimit": {"remaining": 4500, "resetAt": "2025-01-01T12:00:00Z"}
+            "rateLimit": {"remaining": 4500, "resetAt": "2025-01-01T12:00:00Z"},
         }
 
-        with patch.object(client, '_execute_query', new_callable=AsyncMock, return_value=mock_result):
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
             context = await client.get_repository_context("owner", "private-repo")
 
         assert context is not None
@@ -523,10 +532,12 @@ class TestRateLimitHandling:
             "rateLimit": {
                 "remaining": 3000,
                 "resetAt": "2025-01-01T15:00:00Z",
-            }
+            },
         }
 
-        with patch.object(client, '_execute_query', new_callable=AsyncMock, return_value=mock_result):
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
             await client.get_actor_profile("testuser")
 
         assert client._rate_limit_remaining == 3000
@@ -542,11 +553,14 @@ class TestRateLimitHandling:
         mock_client.execute_async = AsyncMock(return_value={})
         client._client = mock_client
 
-        with patch('github_client.graphql_client.logger') as mock_logger:
+        with patch("github_client.graphql_client.logger") as mock_logger:
             await client._execute_query("query { test }", {})
 
             # Should log warning
-            assert any('Low rate limit' in str(call) for call in mock_logger.warning.call_args_list)
+            assert any(
+                "Low rate limit" in str(call)
+                for call in mock_logger.warning.call_args_list
+            )
 
 
 @pytest.mark.unit
@@ -572,10 +586,12 @@ class TestEdgeCases:
                 "organizations": {"nodes": []},
                 # Optional fields missing
             },
-            "rateLimit": {"remaining": 5000, "resetAt": "2025-01-01T12:00:00Z"}
+            "rateLimit": {"remaining": 5000, "resetAt": "2025-01-01T12:00:00Z"},
         }
 
-        with patch.object(client, '_execute_query', new_callable=AsyncMock, return_value=mock_result):
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
             profile = await client.get_actor_profile("minimaluser")
 
         assert profile is not None

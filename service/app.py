@@ -153,7 +153,9 @@ async def root():
 
 @app.get("/summary")
 async def get_summaries(
-    since: str | None = Query(None, description="ISO timestamp to fetch summaries since"),
+    since: str | None = Query(
+        None, description="ISO timestamp to fetch summaries since"
+    ),
     limit: int = Query(50, ge=1, le=500, description="Maximum number of summaries"),
     severity: str | None = Query(None, description="Filter by severity"),
 ):

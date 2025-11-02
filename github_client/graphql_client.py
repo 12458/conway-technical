@@ -135,12 +135,12 @@ class GitHubGraphQLClient:
                 logger.error(f"GraphQL query error (attempt {attempt + 1}): {e}")
                 if "rate limit" in str(e).lower():
                     # Rate limit hit, back off exponentially
-                    wait = 2 ** attempt * 5
+                    wait = 2**attempt * 5
                     logger.warning(f"Rate limited, waiting {wait}s before retry")
                     await asyncio.sleep(wait)
                 elif attempt < retries - 1:
                     # Other errors, exponential backoff
-                    wait = 2 ** attempt
+                    wait = 2**attempt
                     await asyncio.sleep(wait)
                 else:
                     self._consecutive_errors += 1
@@ -152,7 +152,7 @@ class GitHubGraphQLClient:
             except Exception as e:
                 logger.error(f"Unexpected error in GraphQL query: {e}")
                 if attempt < retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
                 else:
                     return None
 
@@ -304,16 +304,16 @@ class GitHubGraphQLClient:
             primary_language=(
                 repo["primaryLanguage"]["name"] if repo.get("primaryLanguage") else None
             ),
-            default_branch=(
-                default_branch_ref["name"] if default_branch_ref else None
-            ),
+            default_branch=(default_branch_ref["name"] if default_branch_ref else None),
             has_security_policy=repo.get("securityPolicyUrl") is not None,
             is_fork=repo["isFork"],
             is_archived=repo["isArchived"],
             topics=[
                 node["topic"]["name"] for node in repo["repositoryTopics"]["nodes"]
             ],
-            license_name=repo["licenseInfo"]["name"] if repo.get("licenseInfo") else None,
+            license_name=repo["licenseInfo"]["name"]
+            if repo.get("licenseInfo")
+            else None,
         )
 
     async def get_workflow_status(
@@ -386,8 +386,12 @@ class GitHubGraphQLClient:
             )
 
         check_suites = commit_obj["checkSuites"]["nodes"]
-        successful = sum(1 for suite in check_suites if suite.get("conclusion") == "SUCCESS")
-        failed = sum(1 for suite in check_suites if suite.get("conclusion") == "FAILURE")
+        successful = sum(
+            1 for suite in check_suites if suite.get("conclusion") == "SUCCESS"
+        )
+        failed = sum(
+            1 for suite in check_suites if suite.get("conclusion") == "FAILURE"
+        )
         pending = sum(
             1
             for suite in check_suites
@@ -448,7 +452,9 @@ class GitHubGraphQLClient:
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                async with session.get(
+                    url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
                     if response.status == 200:
                         patch_content = await response.text()
                         # Limit patch size to avoid memory issues (max 1MB)

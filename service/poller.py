@@ -8,7 +8,11 @@ from datetime import datetime
 from sqlalchemy import select
 
 from github_client import GitHubEventsClient
-from github_client.exceptions import ForbiddenError, GitHubAPIError, ServiceUnavailableError
+from github_client.exceptions import (
+    ForbiddenError,
+    GitHubAPIError,
+    ServiceUnavailableError,
+)
 from service.anomaly_detector import detector
 from service.config import service_settings
 from service.database import AsyncSessionLocal, GitHubEvent
@@ -56,7 +60,9 @@ class GitHubEventsPoller:
 
                 except GitHubAPIError as e:
                     # Other API error - log and continue with backoff
-                    logger.error(f"GitHub API error: {e.message} (status: {e.status_code})")
+                    logger.error(
+                        f"GitHub API error: {e.message} (status: {e.status_code})"
+                    )
                     await self._backoff(30)
 
                 except Exception as e:
@@ -132,9 +138,14 @@ class GitHubEventsPoller:
                     self.event_count += 1
 
                     # Run anomaly detection
-                    score, patterns, features, velocity_score, is_inhuman_speed, velocity_reason = (
-                        detector.process_event(event)
-                    )
+                    (
+                        score,
+                        patterns,
+                        features,
+                        velocity_score,
+                        is_inhuman_speed,
+                        velocity_reason,
+                    ) = detector.process_event(event)
 
                     # Skip if event was filtered (e.g., bot)
                     if score is None:
@@ -185,7 +196,9 @@ class GitHubEventsPoller:
                         )
 
                 except Exception as e:
-                    logger.error(f"Error processing event {event.id}: {e}", exc_info=True)
+                    logger.error(
+                        f"Error processing event {event.id}: {e}", exc_info=True
+                    )
                     await session.rollback()
                     continue
 

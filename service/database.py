@@ -40,11 +40,15 @@ class GitHubEvent(Base):
     repo_id: Mapped[int] = mapped_column(Integer)
 
     # Organization (optional)
-    org_login: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    org_login: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
+    )
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
 
     # Raw payload
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
@@ -113,7 +117,9 @@ class GitHubEvent(Base):
             "repo": repo_data,
             "payload": self.payload,
             "public": True,  # Assume public since we only track public events
-            "created_at": self.created_at.isoformat() if hasattr(self.created_at, 'isoformat') else self.created_at,
+            "created_at": self.created_at.isoformat()
+            if hasattr(self.created_at, "isoformat")
+            else self.created_at,
         }
 
         if org_data:
@@ -135,8 +141,12 @@ class AnomalySummary(Base):
 
     # Summary fields
     title: Mapped[str] = mapped_column(String(200))
-    severity: Mapped[str] = mapped_column(String(20), index=True)  # low, medium, high, critical
-    severity_reasoning: Mapped[str | None] = mapped_column(String(500), nullable=True)  # LLM explanation for severity
+    severity: Mapped[str] = mapped_column(
+        String(20), index=True
+    )  # low, medium, high, critical
+    severity_reasoning: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )  # LLM explanation for severity
 
     # Structured summary
     root_cause: Mapped[list[str]] = mapped_column(JSON)  # 3-5 bullets
@@ -156,8 +166,12 @@ class AnomalySummary(Base):
     raw_event: Mapped[dict[str, Any]] = mapped_column(JSON)
 
     # Timestamps
-    event_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    event_timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
 
     # Metadata
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
@@ -225,12 +239,13 @@ if database_url.startswith("postgresql://"):
     # asyncpg doesn't support sslmode or channel_binding query params, use ssl=require instead
     if "sslmode=" in database_url:
         import re
+
         # Remove sslmode and channel_binding params, add ssl=require
-        database_url = re.sub(r'[&?]sslmode=[^&]*', '', database_url)
-        database_url = re.sub(r'[&?]channel_binding=[^&]*', '', database_url)
+        database_url = re.sub(r"[&?]sslmode=[^&]*", "", database_url)
+        database_url = re.sub(r"[&?]channel_binding=[^&]*", "", database_url)
         # Add ssl=require
-        separator = '&' if '?' in database_url else '?'
-        database_url = database_url + separator + 'ssl=require'
+        separator = "&" if "?" in database_url else "?"
+        database_url = database_url + separator + "ssl=require"
 elif database_url.startswith("sqlite+aiosqlite"):
     pass  # Already correct
 elif database_url.startswith("sqlite://"):

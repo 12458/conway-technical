@@ -60,7 +60,9 @@ class RepositoryContext(BaseModel):
     stargazer_count: int = Field(description="Number of stars")
     fork_count: int = Field(description="Number of forks")
     watcher_count: int = Field(description="Number of watchers")
-    primary_language: str | None = Field(None, description="Primary programming language")
+    primary_language: str | None = Field(
+        None, description="Primary programming language"
+    )
     default_branch: str | None = Field(None, description="Default branch name")
     has_security_policy: bool = Field(description="Whether repo has security policy")
     is_fork: bool = Field(description="Whether this is a fork")
@@ -120,9 +122,7 @@ class WorkflowStatus(BaseModel):
     def failed_check_names(self) -> list[str]:
         """List of failed check run names."""
         return [
-            run["name"]
-            for run in self.check_runs
-            if run.get("conclusion") == "FAILURE"
+            run["name"] for run in self.check_runs if run.get("conclusion") == "FAILURE"
         ]
 
 
@@ -143,7 +143,8 @@ class CommitVerification(BaseModel):
     author_name: str | None = Field(None, description="Commit author name")
     author_email: str | None = Field(None, description="Commit author email")
     commit_entropy: float | None = Field(
-        None, description="Shannon entropy of commit changes (helps detect obfuscated code)"
+        None,
+        description="Shannon entropy of commit changes (helps detect obfuscated code)",
     )
     commit_size: int = Field(
         description="Total size of commit in lines changed (additions + deletions)"

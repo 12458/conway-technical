@@ -15,6 +15,7 @@ class Severity(str, Enum):
 
     Enum values ensure type safety and consistent severity classification.
     """
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -307,7 +308,10 @@ class AnomalyMessage(SSEMessageBase):
                             "id": "12345678901",
                             "type": "PushEvent",
                             "actor": {"id": 987654, "login": "suspicious-user-123"},
-                            "repo": {"id": 1234567, "name": "acme/critical-infrastructure"},
+                            "repo": {
+                                "id": 1234567,
+                                "name": "acme/critical-infrastructure",
+                            },
                             "payload": {"ref": "refs/heads/main"},
                             "public": True,
                             "created_at": "2025-01-01T12:00:00Z",

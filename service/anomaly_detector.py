@@ -6,7 +6,10 @@ from typing import Any
 import numpy as np
 from newrrcf import RCTree
 
-from github_client.feature_extractor import GitHubFeatureExtractor, get_suspicious_patterns
+from github_client.feature_extractor import (
+    GitHubFeatureExtractor,
+    get_suspicious_patterns,
+)
 from github_client.models import Event
 from service.config import service_settings
 
@@ -85,17 +88,20 @@ class StreamingAnomalyDetector:
 
         # Extract timestamp for velocity detection
         import datetime
+
         if isinstance(event.created_at, datetime.datetime):
             event_timestamp = event.created_at.timestamp()
         else:
             # Fallback for string timestamps
             event_timestamp = datetime.datetime.fromisoformat(
-                event.created_at.replace('Z', '+00:00')
+                event.created_at.replace("Z", "+00:00")
             ).timestamp()
 
         # Get velocity-based anomaly score
         velocity_score, is_inhuman_speed, velocity_reason = (
-            self.extractor.get_velocity_anomaly_score(event.actor.login, event_timestamp)
+            self.extractor.get_velocity_anomaly_score(
+                event.actor.login, event_timestamp
+            )
         )
 
         # Get suspicious patterns using rule-based detection
@@ -134,7 +140,14 @@ class StreamingAnomalyDetector:
             f"Velocity: {velocity_score:.1f} events/min, Inhuman: {is_inhuman_speed}"
         )
 
-        return avg_codisp, suspicious_patterns, features, velocity_score, is_inhuman_speed, velocity_reason
+        return (
+            avg_codisp,
+            suspicious_patterns,
+            features,
+            velocity_score,
+            is_inhuman_speed,
+            velocity_reason,
+        )
 
     def is_anomaly(
         self, score: float, patterns: list[str], is_inhuman_speed: bool = False
@@ -202,7 +215,10 @@ class MultiForestAnomalyDetector:
 
         # Build event type to forest group mapping
         self.event_type_to_group: dict[str, str] = {}
-        for group_name, event_types in service_settings.event_type_forest_groups.items():
+        for (
+            group_name,
+            event_types,
+        ) in service_settings.event_type_forest_groups.items():
             for event_type in event_types:
                 self.event_type_to_group[event_type] = group_name
 
@@ -275,17 +291,20 @@ class MultiForestAnomalyDetector:
 
         # Extract timestamp for velocity detection
         import datetime
+
         if isinstance(event.created_at, datetime.datetime):
             event_timestamp = event.created_at.timestamp()
         else:
             # Fallback for string timestamps
             event_timestamp = datetime.datetime.fromisoformat(
-                event.created_at.replace('Z', '+00:00')
+                event.created_at.replace("Z", "+00:00")
             ).timestamp()
 
         # Get velocity-based anomaly score
         velocity_score, is_inhuman_speed, velocity_reason = (
-            self.extractor.get_velocity_anomaly_score(event.actor.login, event_timestamp)
+            self.extractor.get_velocity_anomaly_score(
+                event.actor.login, event_timestamp
+            )
         )
 
         # Get suspicious patterns using rule-based detection
@@ -324,7 +343,14 @@ class MultiForestAnomalyDetector:
             f"Velocity: {velocity_score:.1f} events/min, Inhuman: {is_inhuman_speed}"
         )
 
-        return avg_codisp, suspicious_patterns, features, velocity_score, is_inhuman_speed, velocity_reason
+        return (
+            avg_codisp,
+            suspicious_patterns,
+            features,
+            velocity_score,
+            is_inhuman_speed,
+            velocity_reason,
+        )
 
     def is_anomaly(
         self, score: float, patterns: list[str], is_inhuman_speed: bool = False
@@ -360,7 +386,9 @@ class MultiForestAnomalyDetector:
 
             forest_stats[group_name] = {
                 "points_processed": detector.point_index,
-                "avg_tree_size": group_points / len(detector.forest) if detector.forest else 0,
+                "avg_tree_size": group_points / len(detector.forest)
+                if detector.forest
+                else 0,
             }
 
         return {

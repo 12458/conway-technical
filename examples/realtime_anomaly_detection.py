@@ -176,7 +176,9 @@ class StreamingRRCFDetector:
 
         # Calculate adaptive threshold
         if len(self.score_window) >= 20:  # Need minimum samples
-            threshold = np.percentile(list(self.score_window), self.percentile_threshold)
+            threshold = np.percentile(
+                list(self.score_window), self.percentile_threshold
+            )
         else:
             threshold = 2.0  # Default threshold
 
@@ -304,8 +306,12 @@ def monitor_stream(archive_path: str, alert_threshold: str = "medium") -> None:
                     "critical": "🚨",
                 }
 
-                print(f"\n{severity_emoji.get(severity, '')} ALERT - {severity.upper()}")
-                print(f"  Score: {result['anomaly_score']:.2f} (threshold: {result['threshold']:.2f})")
+                print(
+                    f"\n{severity_emoji.get(severity, '')} ALERT - {severity.upper()}"
+                )
+                print(
+                    f"  Score: {result['anomaly_score']:.2f} (threshold: {result['threshold']:.2f})"
+                )
                 print(f"  Event: {event.type} by {event.actor.login}")
                 print(f"  Repo: {event.repo.name}")
                 print(f"  Time: {event.created_at}")
@@ -348,14 +354,20 @@ def monitor_stream(archive_path: str, alert_threshold: str = "medium") -> None:
 def main() -> None:
     """Main entry point."""
     if len(sys.argv) < 2:
-        print("Usage: python realtime_anomaly_detection.py <archive-file.json.gz> [alert_threshold]")
+        print(
+            "Usage: python realtime_anomaly_detection.py <archive-file.json.gz> [alert_threshold]"
+        )
         print()
         print("Arguments:")
         print("  archive-file.json.gz  Path to GH Archive file")
-        print("  alert_threshold       Optional: low/medium/high/critical (default: medium)")
+        print(
+            "  alert_threshold       Optional: low/medium/high/critical (default: medium)"
+        )
         print()
         print("Example:")
-        print("  python examples/realtime_anomaly_detection.py 2015-01-01-15.json.gz high")
+        print(
+            "  python examples/realtime_anomaly_detection.py 2015-01-01-15.json.gz high"
+        )
         sys.exit(1)
 
     archive_path = sys.argv[1]

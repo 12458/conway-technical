@@ -25,7 +25,9 @@ async def test_parse_public_events():
             assert event.actor.id is not None, "Actor should have an ID"
             assert event.repo is not None, "Event should have a repo"
             assert event.repo.id is not None, "Repo should have an ID"
-            assert event.created_at is not None, "Event should have a created_at timestamp"
+            assert event.created_at is not None, (
+                "Event should have a created_at timestamp"
+            )
 
             # Verify we can create a database record from the event
             db_event = GitHubEvent(

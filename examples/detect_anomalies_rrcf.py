@@ -177,7 +177,9 @@ def analyze_archive_for_anomalies(
             actor_stats = detector.feature_extractor.get_actor_stats(event.actor.login)
             actor_count = actor_stats["total_events"]
             if actor_count > 50:
-                suspicious_patterns.append(f"High activity: {actor_count:.1f} decayed events")
+                suspicious_patterns.append(
+                    f"High activity: {actor_count:.1f} decayed events"
+                )
 
             # Check for delete events (potentially destructive)
             if event.type in ["DeleteEvent", "DestroyEvent"]:
@@ -223,11 +225,15 @@ def analyze_archive_for_anomalies(
 def main() -> None:
     """Main entry point for the anomaly detection script."""
     if len(sys.argv) < 2:
-        print("Usage: python detect_anomalies_rrcf.py <archive-file.json.gz> [threshold]")
+        print(
+            "Usage: python detect_anomalies_rrcf.py <archive-file.json.gz> [threshold]"
+        )
         print()
         print("Arguments:")
         print("  archive-file.json.gz  Path to GH Archive file")
-        print("  threshold             Optional: Anomaly score threshold (default: 2.0)")
+        print(
+            "  threshold             Optional: Anomaly score threshold (default: 2.0)"
+        )
         print()
         print("Example:")
         print("  # Download an archive:")

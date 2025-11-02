@@ -92,7 +92,13 @@ class TestFeatureExtractorInitialization:
 
     def test_custom_initialization(self):
         """Test extractor initializes with custom values."""
-        custom_cat_dims = {"event_type": 16, "actor": 32, "repo": 32, "org": 16, "action": 8}
+        custom_cat_dims = {
+            "event_type": 16,
+            "actor": 32,
+            "repo": 32,
+            "org": 16,
+            "action": 8,
+        }
         custom_text_dims = {"commits": 32, "titles": 16, "bodies": 16, "comments": 16}
 
         extractor = GitHubFeatureExtractor(
@@ -501,7 +507,9 @@ class TestEventTypeFeatureExtraction:
                 {"message": "Add feature", "author": {"name": "Test"}},
             ],
         }
-        event = create_test_event("PushEvent", "testuser", "owner/repo", payload=payload)
+        event = create_test_event(
+            "PushEvent", "testuser", "owner/repo", payload=payload
+        )
 
         features = extractor.extract_features(event)
 
@@ -516,7 +524,9 @@ class TestEventTypeFeatureExtraction:
             "action": "opened",
             "issue": {"title": "Bug report", "body": "There is a bug"},
         }
-        event = create_test_event("IssuesEvent", "testuser", "owner/repo", payload=payload)
+        event = create_test_event(
+            "IssuesEvent", "testuser", "owner/repo", payload=payload
+        )
 
         features = extractor.extract_features(event)
 
@@ -534,7 +544,9 @@ class TestEventTypeFeatureExtraction:
                 "body": "This PR adds a new feature",
             },
         }
-        event = create_test_event("PullRequestEvent", "testuser", "owner/repo", payload=payload)
+        event = create_test_event(
+            "PullRequestEvent", "testuser", "owner/repo", payload=payload
+        )
 
         features = extractor.extract_features(event)
 
@@ -546,7 +558,9 @@ class TestEventTypeFeatureExtraction:
         extractor = GitHubFeatureExtractor(filter_bots=False, normalize=False)
 
         payload = {"action": "added", "member": {"login": "newmember"}}
-        event = create_test_event("MemberEvent", "testuser", "owner/repo", payload=payload)
+        event = create_test_event(
+            "MemberEvent", "testuser", "owner/repo", payload=payload
+        )
 
         features = extractor.extract_features(event)
 
@@ -558,7 +572,9 @@ class TestEventTypeFeatureExtraction:
         extractor = GitHubFeatureExtractor(filter_bots=False, normalize=False)
 
         payload = {"ref": "feature-branch", "ref_type": "branch"}
-        event = create_test_event("DeleteEvent", "testuser", "owner/repo", payload=payload)
+        event = create_test_event(
+            "DeleteEvent", "testuser", "owner/repo", payload=payload
+        )
 
         features = extractor.extract_features(event)
 
@@ -588,7 +604,9 @@ class TestEdgeCases:
 
         # PushEvent payload with missing 'commits' field
         payload = {"ref": "refs/heads/main"}
-        event = create_test_event("PushEvent", "testuser", "owner/repo", payload=payload)
+        event = create_test_event(
+            "PushEvent", "testuser", "owner/repo", payload=payload
+        )
 
         features = extractor.extract_features(event)
 

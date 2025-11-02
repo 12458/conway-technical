@@ -48,9 +48,7 @@ class TestGHArchiveLoader:
 
         assert "not found" in str(exc_info.value).lower()
 
-    def test_loader_initialization_with_existing_file(
-        self, sample_gharchive_file
-    ):
+    def test_loader_initialization_with_existing_file(self, sample_gharchive_file):
         """Test loader initializes successfully with existing file."""
         loader = GHArchiveLoader(sample_gharchive_file)
 
@@ -75,9 +73,7 @@ class TestGHArchiveLoader:
         assert "file_size_mb" in info
         assert info["file_size_bytes"] > 0
 
-    def test_iter_events_with_valid_events(
-        self, sample_gharchive_file
-    ):
+    def test_iter_events_with_valid_events(self, sample_gharchive_file):
         """Test iterating over valid events."""
         loader = GHArchiveLoader(sample_gharchive_file)
 
@@ -136,7 +132,7 @@ class TestGHArchiveLoader:
         archive_file = tmp_path / "invalid.json.gz"
         with gzip.open(archive_file, "wt", encoding="utf-8") as f:
             f.write('{"id": "1", "type": "WatchEvent"}\n')  # Valid
-            f.write('invalid json here\n')  # Invalid
+            f.write("invalid json here\n")  # Invalid
             f.write('{"id": "2", "type": "WatchEvent"}\n')  # Valid
 
         loader = GHArchiveLoader(archive_file, strict=False)
@@ -153,7 +149,7 @@ class TestGHArchiveLoader:
         # Create archive with invalid JSON
         archive_file = tmp_path / "invalid.json.gz"
         with gzip.open(archive_file, "wt", encoding="utf-8") as f:
-            f.write('invalid json\n')
+            f.write("invalid json\n")
 
         loader = GHArchiveLoader(archive_file, strict=True)
 
@@ -180,9 +176,9 @@ class TestGHArchiveLoader:
         """Test that empty lines are skipped."""
         archive_file = tmp_path / "empty_lines.json.gz"
         with gzip.open(archive_file, "wt", encoding="utf-8") as f:
-            f.write('\n')  # Empty line
-            f.write('  \n')  # Whitespace line
-            f.write('\n')  # Empty line
+            f.write("\n")  # Empty line
+            f.write("  \n")  # Whitespace line
+            f.write("\n")  # Empty line
 
         loader = GHArchiveLoader(archive_file)
         events = list(loader.iter_events())
@@ -191,9 +187,7 @@ class TestGHArchiveLoader:
         # Empty lines shouldn't count as total events
         assert loader.get_stats().total_events == 0
 
-    def test_multiple_iterations_accumulate_stats(
-        self, sample_gharchive_file
-    ):
+    def test_multiple_iterations_accumulate_stats(self, sample_gharchive_file):
         """Test that multiple iterations accumulate statistics."""
         loader = GHArchiveLoader(sample_gharchive_file)
 
@@ -233,4 +227,5 @@ class TestGHArchiveLoader:
         event = events[0]
         # Verify created_at is a datetime object
         from datetime import datetime
+
         assert isinstance(event.created_at, datetime)

@@ -149,8 +149,12 @@ class GitHubFeatureExtractor:
         self.actor_last_event_time = {}  # actor -> last event timestamp
 
         # Temporal burst tracking (for bot/spam detection)
-        self.actor_bursts = OrderedDict()  # actor -> list of (timestamp, event_count) tuples
-        self.actor_repos_windowed = OrderedDict()  # actor -> deque of (timestamp, repo) tuples for time-windowed repo hopping
+        self.actor_bursts = (
+            OrderedDict()
+        )  # actor -> list of (timestamp, event_count) tuples
+        self.actor_repos_windowed = (
+            OrderedDict()
+        )  # actor -> deque of (timestamp, repo) tuples for time-windowed repo hopping
 
         # Event counter for lazy decay
         self.total_events = 0
@@ -171,7 +175,7 @@ class GitHubFeatureExtractor:
             Decayed count at current time
         """
         events_elapsed = self.total_events - last_seen
-        return count * (self.decay_alpha ** events_elapsed)
+        return count * (self.decay_alpha**events_elapsed)
 
     def _evict_lru_actors(self) -> None:
         """Evict oldest actor if limit exceeded."""
@@ -251,9 +255,11 @@ class GitHubFeatureExtractor:
             return vec
 
         # Clip text to MAX_TEXT_BYTES for performance
-        if len(text.encode('utf-8', errors='ignore')) > MAX_TEXT_BYTES:
+        if len(text.encode("utf-8", errors="ignore")) > MAX_TEXT_BYTES:
             # Truncate at character boundary
-            text = text.encode('utf-8', errors='ignore')[:MAX_TEXT_BYTES].decode('utf-8', errors='ignore')
+            text = text.encode("utf-8", errors="ignore")[:MAX_TEXT_BYTES].decode(
+                "utf-8", errors="ignore"
+            )
 
         # Generate character n-grams
         text_clean = text.lower()
@@ -353,7 +359,9 @@ class GitHubFeatureExtractor:
 
         # Initialize deque if needed
         if actor_login not in self.actor_timestamps:
-            self.actor_timestamps[actor_login] = deque(maxlen=service_settings.max_timestamps_per_actor)
+            self.actor_timestamps[actor_login] = deque(
+                maxlen=service_settings.max_timestamps_per_actor
+            )
 
         # Add current timestamp
         self.actor_timestamps[actor_login].append(timestamp)
@@ -372,7 +380,9 @@ class GitHubFeatureExtractor:
         while timestamps_deque and timestamps_deque[0] < cutoff_time:
             timestamps_deque.popleft()
 
-    def _get_time_based_features(self, actor_login: str, current_timestamp: float) -> np.ndarray:
+    def _get_time_based_features(
+        self, actor_login: str, current_timestamp: float
+    ) -> np.ndarray:
         """Calculate time-based velocity features for an actor.
 
         Returns 5 features:
@@ -410,7 +420,9 @@ class GitHubFeatureExtractor:
         # Features 2-4: Inter-event time statistics (need at least 2 events)
         if len(timestamps) >= 2:
             # Calculate time deltas between consecutive events
-            deltas = [timestamps[i] - timestamps[i-1] for i in range(1, len(timestamps))]
+            deltas = [
+                timestamps[i] - timestamps[i - 1] for i in range(1, len(timestamps))
+            ]
 
             # Feature 2: Average inter-event time
             features[1] = np.mean(deltas) if deltas else 0.0
@@ -506,7 +518,9 @@ class GitHubFeatureExtractor:
 
         return (velocity_score, is_inhuman, reason)
 
-    def _update_burst_tracking(self, actor_login: str, current_timestamp: float) -> None:
+    def _update_burst_tracking(
+        self, actor_login: str, current_timestamp: float
+    ) -> None:
         """Update burst tracking for an actor.
 
         Detects bursts of activity (multiple events in short time windows) which
@@ -576,7 +590,9 @@ class GitHubFeatureExtractor:
 
         # Initialize deque if needed
         if actor_login not in self.actor_repos_windowed:
-            self.actor_repos_windowed[actor_login] = deque(maxlen=500)  # Limit per actor
+            self.actor_repos_windowed[actor_login] = deque(
+                maxlen=500
+            )  # Limit per actor
 
         # Add current repo-timestamp pair
         self.actor_repos_windowed[actor_login].append((current_timestamp, repo_name))
@@ -633,7 +649,9 @@ class GitHubFeatureExtractor:
         # Features 2-3: Require at least 2 events
         if len(timestamps) >= 2:
             # Calculate inter-event times
-            deltas = [timestamps[i] - timestamps[i - 1] for i in range(1, len(timestamps))]
+            deltas = [
+                timestamps[i] - timestamps[i - 1] for i in range(1, len(timestamps))
+            ]
 
             # Feature 2: Silence ratio
             # High silence ratio = long gaps between events (more human-like)
@@ -722,12 +740,13 @@ class GitHubFeatureExtractor:
 
         # Extract timestamp from event (created_at is already a datetime object)
         import datetime
+
         if isinstance(event.created_at, datetime.datetime):
             event_timestamp = event.created_at.timestamp()
         else:
             # Fallback for string timestamps
             event_timestamp = datetime.datetime.fromisoformat(
-                event.created_at.replace('Z', '+00:00')
+                event.created_at.replace("Z", "+00:00")
             ).timestamp()
 
         # Update timestamp tracking for velocity and burst detection
@@ -796,7 +815,9 @@ class GitHubFeatureExtractor:
         # Actor behavioral features (4)
         features[idx] = decayed_count + 1.0  # Current decayed count
         features[idx + 1] = len(self.actor_repos[actor_login])  # All-time unique repos
-        features[idx + 2] = self.get_repo_hopping_features(actor_login, event_timestamp)  # Windowed unique repos
+        features[idx + 2] = self.get_repo_hopping_features(
+            actor_login, event_timestamp
+        )  # Windowed unique repos
         features[idx + 3] = event.actor.id % 10000  # Actor ID pattern
         idx += 4
 
@@ -1019,7 +1040,9 @@ class GitHubFeatureExtractor:
 
             forkee = p.get("forkee", {})
             features[idx] = 1.0 if forkee.get("private", False) else 0.0
-            features[idx + 1] = 1.0 if forkee.get("fork", False) else 0.0  # Fork of fork
+            features[idx + 1] = (
+                1.0 if forkee.get("fork", False) else 0.0
+            )  # Fork of fork
 
         elif event.type == "IssueCommentEvent":
             action = p.get("action", "")
@@ -1194,9 +1217,7 @@ def get_suspicious_patterns(
 
     # Repo hopping (skip for bots)
     if not is_bot and actor_stats["unique_repos"] > 20:
-        patterns.append(
-            f"Repo hopping: {actor_stats['unique_repos']} different repos"
-        )
+        patterns.append(f"Repo hopping: {actor_stats['unique_repos']} different repos")
 
     # Destructive actions (ALWAYS flag - these should always alert)
     if event.type in ["DeleteEvent", "DestroyEvent"]:
