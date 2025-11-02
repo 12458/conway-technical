@@ -3,16 +3,16 @@
 import pytest
 
 from service.config import service_settings
-from service.database import init_db
+from service.database import check_database_connection
 from service.queue import get_redis_connection
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_database():
-    """Test database initialization."""
-    await init_db()
-    # If we get here without exception, the database initialized successfully
+    """Test database connection."""
+    is_healthy = await check_database_connection()
+    assert is_healthy, "Database connection failed"
 
 
 @pytest.mark.integration
