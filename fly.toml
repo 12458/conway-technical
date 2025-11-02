@@ -8,6 +8,32 @@ primary_region = 'iad'
 
 [build]
 
+[env]
+  # AI Configuration
+  SERVICE_AI_PROVIDER = "openai"
+  SERVICE_AI_MODEL = "gpt-5-mini-2025-08-07"
+
+  # Polling Configuration
+  SERVICE_POLLING_INTERVAL = "60"
+  SERVICE_MAX_BACKOFF_SECONDS = "300"
+  SERVICE_MAX_EVENTS_PER_FETCH = "100"
+
+  # Anomaly Detection Configuration
+  SERVICE_ANOMALY_THRESHOLD = "90.0"
+  SERVICE_TREE_SIZE = "256"
+  SERVICE_NUM_TREES = "50"
+  SERVICE_ENABLE_BOT_FILTERING = "true"
+  SERVICE_ENABLE_MULTI_FOREST = "true"
+
+  # Worker Configuration
+  SERVICE_WORKER_COUNT = "2"
+  SERVICE_QUEUE_NAME = "github-anomalies"
+
+  # Feature Flags
+  SERVICE_ENRICHMENT_ENABLED = "true"
+  SERVICE_ENRICHMENT_BATCH_SIZE = "10"
+  SERVICE_ENRICHMENT_TIMEOUT_MS = "5000"
+
 [http_service]
   internal_port = 8000
   force_https = true
