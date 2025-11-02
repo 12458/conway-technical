@@ -36,6 +36,7 @@ def cleanup_stale_workers():
     didn't properly unregister.
     """
     from rq import Worker
+    from rq.worker import WorkerStatus
     from service.queue import redis_conn
 
     try:
@@ -43,14 +44,23 @@ def cleanup_stale_workers():
         cleaned = 0
 
         for worker in workers:
-            # Check if worker is actually alive
+            # Check if worker is actually alive by checking its state
             try:
-                if not worker.is_alive():
-                    logger.info(f"Cleaning up stale worker: {worker.name}")
+                state = worker.get_state()
+                # If worker is idle, busy, or starting, it's alive
+                # If it's suspended or we can't get state, clean it up
+                if state not in (WorkerStatus.STARTED, WorkerStatus.IDLE, WorkerStatus.BUSY):
+                    logger.info(f"Cleaning up stale worker: {worker.name} (state: {state})")
                     worker.register_death()
                     cleaned += 1
             except Exception as e:
-                logger.warning(f"Error checking worker {worker.name}: {e}")
+                # If we can't get state, worker is likely stale
+                logger.info(f"Cleaning up unreachable worker {worker.name}: {e}")
+                try:
+                    worker.register_death()
+                    cleaned += 1
+                except Exception:
+                    pass
 
         if cleaned > 0:
             logger.info(f"Cleaned up {cleaned} stale worker(s)")
