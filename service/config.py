@@ -84,11 +84,11 @@ class ServiceSettings(BaseSettings):
         description="Number of recent scores to track for adaptive threshold calculation",
     )
     adaptive_percentile: float = Field(
-        default=95.0,
-        description="Percentile to use for adaptive threshold (95.0 = top 5% flagged)",
+        default=98.0,
+        description="Percentile to use for adaptive threshold (98.0 = top 2% flagged)",
     )
     min_samples_for_adaptive: int = Field(
-        default=100,
+        default=1000,
         description="Minimum samples before enabling adaptive threshold (warm-up period)",
     )
 
