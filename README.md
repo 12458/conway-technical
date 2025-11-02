@@ -2,36 +2,14 @@
 
 Real-time anomaly detection and alerting system for GitHub public events using RRCF (Robust Random Cut Forest) and AI-powered summarization.
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [Features](#features)
-- [API Reference](#api-reference)
-- [GitHub Client Library](#github-client-library)
-- [Configuration](#configuration)
-- [Database Schema](#database-schema)
-- [Testing](#testing)
-- [Deployment](#deployment)
-- [Implementation Details](#implementation-details)
-
----
-
-## Overview
-
-This project is an AI-powered warning system that continuously ingests public GitHub activity, detects suspicious patterns using machine learning, and streams incident summaries to a real-time user interface.
-
 ### What Was Built
 
 A complete background polling service for GitHub Events API with:
 - **RRCF-based streaming anomaly detection** (50 trees, 256 samples each)
 - **GraphQL enrichment pipeline** for enhanced context
-- **AI-powered summarization** using Claude 3.5 Sonnet or GPT-4
+- **AI-powered summarization** using GPT 5 mini
 - **Real-time SSE streaming** for instant UI updates
 - **Redis Queue** for scalable async job processing
-- **RESTful API** with comprehensive endpoints
-- **Production-ready** with proper error handling, retries, and monitoring
 
 ### Novel Approaches
 
