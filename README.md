@@ -59,15 +59,6 @@ You should see:
 python run_service.py
 ```
 
-Output should show:
-```
-Starting RQ worker #1
-Starting RQ worker #2
-Starting FastAPI server on 0.0.0.0:8000
-Starting GitHub Events polling service
-Background poller started
-```
-
 #### 5. Test Endpoints
 
 Open a new terminal:
