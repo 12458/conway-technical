@@ -274,9 +274,7 @@ async def get_stats():
     """
     async with AsyncSessionLocal() as session:
         # Count total summaries efficiently using COUNT(*)
-        result = await session.execute(
-            select(func.count()).select_from(AnomalySummary)
-        )
+        result = await session.execute(select(func.count()).select_from(AnomalySummary))
         total_summaries = result.scalar()
 
         # Count by severity efficiently using COUNT(*) for each severity

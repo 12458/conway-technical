@@ -233,7 +233,7 @@ class GitHubFeatureExtractor:
         # Clip text to max_text_bytes for performance
         if len(text.encode("utf-8", errors="ignore")) > self.max_text_bytes:
             # Truncate at character boundary
-            text = text.encode("utf-8", errors="ignore")[:self.max_text_bytes].decode(
+            text = text.encode("utf-8", errors="ignore")[: self.max_text_bytes].decode(
                 "utf-8", errors="ignore"
             )
 

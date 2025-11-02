@@ -405,7 +405,10 @@ class TestGenerateWithOpenAI:
         # Assertions
         assert result["title"] == "Test Incident Title"
         assert result["severity"] == "high"
-        assert result["severity_reasoning"] == "High severity due to new account and critical repo"
+        assert (
+            result["severity_reasoning"]
+            == "High severity due to new account and critical repo"
+        )
         assert len(result["root_cause"]) == 3
         assert len(result["impact"]) == 2
         assert len(result["next_steps"]) == 3
@@ -477,7 +480,12 @@ class TestGenerateWithOpenAI:
         mock_settings.openai_api_key = "test-api-key"
         mock_settings.ai_model = "gpt-4o"
 
-        for severity in [Severity.LOW, Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL]:
+        for severity in [
+            Severity.LOW,
+            Severity.MEDIUM,
+            Severity.HIGH,
+            Severity.CRITICAL,
+        ]:
             mock_response = MagicMock()
             mock_response.output_parsed = EnhancedSummaryResponse(
                 title="Test",
@@ -507,7 +515,11 @@ class TestGenerateEnhancedSummary:
     @patch("service.enhanced_summarizer._build_enhanced_context")
     @patch("service.enhanced_summarizer.service_settings")
     async def test_generate_enhanced_summary_openai(
-        self, mock_settings, mock_build_context, mock_generate_openai, sample_enriched_event_full
+        self,
+        mock_settings,
+        mock_build_context,
+        mock_generate_openai,
+        sample_enriched_event_full,
     ):
         """Test summary generation with OpenAI provider."""
         mock_settings.ai_provider = "openai"

@@ -90,7 +90,13 @@ class BaseAnomalyDetector:
         # Get suspicious patterns using rule-based detection
         suspicious_patterns = get_suspicious_patterns(event, extractor)
 
-        return features, velocity_score, is_inhuman_speed, velocity_reason, suspicious_patterns
+        return (
+            features,
+            velocity_score,
+            is_inhuman_speed,
+            velocity_reason,
+            suspicious_patterns,
+        )
 
     def _process_rrcf_trees(
         self,

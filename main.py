@@ -88,7 +88,9 @@ def run_worker(worker_num: int):
 
         # Setup signal handlers for graceful shutdown
         def cleanup_handler(signum, frame):
-            logger.info(f"Worker {worker_name} received signal {signum}, cleaning up...")
+            logger.info(
+                f"Worker {worker_name} received signal {signum}, cleaning up..."
+            )
             if worker:
                 worker.register_death()
             sys.exit(0)

@@ -244,9 +244,13 @@ class TestEnrichAnomaly:
 
         # Setup GraphQL client responses
         mock_graphql_client.get_actor_profile.return_value = sample_actor_profile
-        mock_graphql_client.get_repository_context.return_value = sample_repository_context
+        mock_graphql_client.get_repository_context.return_value = (
+            sample_repository_context
+        )
         mock_graphql_client.get_workflow_status.return_value = sample_workflow_status
-        mock_graphql_client.get_commit_verification.return_value = sample_commit_verification
+        mock_graphql_client.get_commit_verification.return_value = (
+            sample_commit_verification
+        )
 
         service = EnrichmentService(
             graphql_client=mock_graphql_client,
@@ -280,7 +284,12 @@ class TestEnrichAnomaly:
         mock_cache = AsyncMock()
         mock_cache.get_actor_profile.side_effect = Exception("API Error")
         mock_cache.get_repository_context.return_value = None
-        mock_cache.cache_stats = {"hits": 0, "misses": 0, "total_requests": 0, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 0,
+            "total_requests": 0,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         service = EnrichmentService(
@@ -307,7 +316,12 @@ class TestEnrichAnomaly:
         mock_cache = AsyncMock()
         mock_cache.get_actor_profile.return_value = None
         mock_cache.get_repository_context.side_effect = Exception("API Error")
-        mock_cache.cache_stats = {"hits": 0, "misses": 0, "total_requests": 0, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 0,
+            "total_requests": 0,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         mock_graphql_client.get_actor_profile.return_value = None
@@ -343,7 +357,12 @@ class TestActorProfileEnrichment:
         # Setup cache manager mock
         mock_cache = AsyncMock()
         mock_cache.get_actor_profile.return_value = sample_actor_profile
-        mock_cache.cache_stats = {"hits": 1, "misses": 0, "total_requests": 1, "hit_rate": 1.0}
+        mock_cache.cache_stats = {
+            "hits": 1,
+            "misses": 0,
+            "total_requests": 1,
+            "hit_rate": 1.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         service = EnrichmentService(
@@ -371,7 +390,12 @@ class TestActorProfileEnrichment:
         # Setup cache manager mock
         mock_cache = AsyncMock()
         mock_cache.get_actor_profile.return_value = None  # Cache miss
-        mock_cache.cache_stats = {"hits": 0, "misses": 1, "total_requests": 1, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 1,
+            "total_requests": 1,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         mock_graphql_client.get_actor_profile.return_value = sample_actor_profile
@@ -398,7 +422,12 @@ class TestActorProfileEnrichment:
         # Setup cache manager mock
         mock_cache = AsyncMock()
         mock_cache.get_actor_profile.return_value = None
-        mock_cache.cache_stats = {"hits": 0, "misses": 1, "total_requests": 1, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 1,
+            "total_requests": 1,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         mock_graphql_client.get_actor_profile.return_value = None
@@ -432,7 +461,12 @@ class TestRepositoryContextEnrichment:
         # Setup cache manager mock
         mock_cache = AsyncMock()
         mock_cache.get_repository_context.return_value = sample_repository_context
-        mock_cache.cache_stats = {"hits": 1, "misses": 0, "total_requests": 1, "hit_rate": 1.0}
+        mock_cache.cache_stats = {
+            "hits": 1,
+            "misses": 0,
+            "total_requests": 1,
+            "hit_rate": 1.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         service = EnrichmentService(
@@ -444,7 +478,9 @@ class TestRepositoryContextEnrichment:
         context = await service._enrich_repository_context("testowner", "testrepo")
 
         assert context == sample_repository_context
-        mock_cache.get_repository_context.assert_called_once_with("testowner", "testrepo")
+        mock_cache.get_repository_context.assert_called_once_with(
+            "testowner", "testrepo"
+        )
         mock_graphql_client.get_repository_context.assert_not_called()
 
     @pytest.mark.asyncio
@@ -460,10 +496,17 @@ class TestRepositoryContextEnrichment:
         # Setup cache manager mock
         mock_cache = AsyncMock()
         mock_cache.get_repository_context.return_value = None
-        mock_cache.cache_stats = {"hits": 0, "misses": 1, "total_requests": 1, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 1,
+            "total_requests": 1,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
-        mock_graphql_client.get_repository_context.return_value = sample_repository_context
+        mock_graphql_client.get_repository_context.return_value = (
+            sample_repository_context
+        )
 
         service = EnrichmentService(
             graphql_client=mock_graphql_client,
@@ -477,7 +520,9 @@ class TestRepositoryContextEnrichment:
         mock_graphql_client.get_repository_context.assert_called_once_with(
             "testowner", "testrepo"
         )
-        mock_cache.set_repository_context.assert_called_once_with(sample_repository_context)
+        mock_cache.set_repository_context.assert_called_once_with(
+            sample_repository_context
+        )
 
 
 @pytest.mark.unit
@@ -500,11 +545,18 @@ class TestPushEventEnrichment:
         mock_cache = AsyncMock()
         mock_cache.get_workflow_status.return_value = None
         mock_cache.get_commit_verification.return_value = None
-        mock_cache.cache_stats = {"hits": 0, "misses": 2, "total_requests": 2, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 2,
+            "total_requests": 2,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         mock_graphql_client.get_workflow_status.return_value = sample_workflow_status
-        mock_graphql_client.get_commit_verification.return_value = sample_commit_verification
+        mock_graphql_client.get_commit_verification.return_value = (
+            sample_commit_verification
+        )
 
         service = EnrichmentService(
             graphql_client=mock_graphql_client,
@@ -528,7 +580,12 @@ class TestPushEventEnrichment:
     ):
         """Test PushEvent enrichment with missing head SHA."""
         mock_cache = AsyncMock()
-        mock_cache.cache_stats = {"hits": 0, "misses": 0, "total_requests": 0, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 0,
+            "total_requests": 0,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         event = Event(
@@ -558,7 +615,9 @@ class TestPushEventEnrichment:
             enabled=True,
         )
 
-        enriched = EnrichedEvent(event=event, anomaly_score=75.0, suspicious_patterns=[])
+        enriched = EnrichedEvent(
+            event=event, anomaly_score=75.0, suspicious_patterns=[]
+        )
 
         await service._enrich_push_event(event, enriched)
 
@@ -580,10 +639,17 @@ class TestPushEventEnrichment:
         mock_cache = AsyncMock()
         mock_cache.get_workflow_status.side_effect = Exception("API Error")
         mock_cache.get_commit_verification.return_value = None
-        mock_cache.cache_stats = {"hits": 0, "misses": 1, "total_requests": 1, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 1,
+            "total_requests": 1,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
-        mock_graphql_client.get_commit_verification.return_value = sample_commit_verification
+        mock_graphql_client.get_commit_verification.return_value = (
+            sample_commit_verification
+        )
 
         service = EnrichmentService(
             graphql_client=mock_graphql_client,
@@ -617,7 +683,12 @@ class TestPullRequestEventEnrichment:
         """Test PullRequestEvent enrichment with valid head SHA."""
         mock_cache = AsyncMock()
         mock_cache.get_workflow_status.return_value = None
-        mock_cache.cache_stats = {"hits": 0, "misses": 1, "total_requests": 1, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 1,
+            "total_requests": 1,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         mock_graphql_client.get_workflow_status.return_value = sample_workflow_status
@@ -652,7 +723,9 @@ class TestPullRequestEventEnrichment:
             enabled=True,
         )
 
-        enriched = EnrichedEvent(event=event, anomaly_score=75.0, suspicious_patterns=[])
+        enriched = EnrichedEvent(
+            event=event, anomaly_score=75.0, suspicious_patterns=[]
+        )
 
         await service._enrich_pull_request_event(event, enriched)
 
@@ -665,7 +738,12 @@ class TestPullRequestEventEnrichment:
     ):
         """Test PullRequestEvent enrichment with missing head SHA."""
         mock_cache = AsyncMock()
-        mock_cache.cache_stats = {"hits": 0, "misses": 0, "total_requests": 0, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 0,
+            "total_requests": 0,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         event = Event(
@@ -695,7 +773,9 @@ class TestPullRequestEventEnrichment:
             enabled=True,
         )
 
-        enriched = EnrichedEvent(event=event, anomaly_score=75.0, suspicious_patterns=[])
+        enriched = EnrichedEvent(
+            event=event, anomaly_score=75.0, suspicious_patterns=[]
+        )
 
         await service._enrich_pull_request_event(event, enriched)
 
@@ -719,7 +799,12 @@ class TestWorkflowStatusEnrichment:
         """Test workflow status enrichment with cache hit."""
         mock_cache = AsyncMock()
         mock_cache.get_workflow_status.return_value = sample_workflow_status
-        mock_cache.cache_stats = {"hits": 1, "misses": 0, "total_requests": 1, "hit_rate": 1.0}
+        mock_cache.cache_stats = {
+            "hits": 1,
+            "misses": 0,
+            "total_requests": 1,
+            "hit_rate": 1.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         service = EnrichmentService(
@@ -728,7 +813,9 @@ class TestWorkflowStatusEnrichment:
             enabled=True,
         )
 
-        status = await service._enrich_workflow_status("testowner", "testrepo", "abc123")
+        status = await service._enrich_workflow_status(
+            "testowner", "testrepo", "abc123"
+        )
 
         assert status == sample_workflow_status
         mock_graphql_client.get_workflow_status.assert_not_called()
@@ -745,7 +832,12 @@ class TestWorkflowStatusEnrichment:
         """Test workflow status enrichment with cache miss."""
         mock_cache = AsyncMock()
         mock_cache.get_workflow_status.return_value = None
-        mock_cache.cache_stats = {"hits": 0, "misses": 1, "total_requests": 1, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 1,
+            "total_requests": 1,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         mock_graphql_client.get_workflow_status.return_value = sample_workflow_status
@@ -756,7 +848,9 @@ class TestWorkflowStatusEnrichment:
             enabled=True,
         )
 
-        status = await service._enrich_workflow_status("testowner", "testrepo", "abc123")
+        status = await service._enrich_workflow_status(
+            "testowner", "testrepo", "abc123"
+        )
 
         assert status == sample_workflow_status
         mock_graphql_client.get_workflow_status.assert_called_once_with(
@@ -781,7 +875,12 @@ class TestCommitVerificationEnrichment:
         """Test commit verification enrichment with cache hit."""
         mock_cache = AsyncMock()
         mock_cache.get_commit_verification.return_value = sample_commit_verification
-        mock_cache.cache_stats = {"hits": 1, "misses": 0, "total_requests": 1, "hit_rate": 1.0}
+        mock_cache.cache_stats = {
+            "hits": 1,
+            "misses": 0,
+            "total_requests": 1,
+            "hit_rate": 1.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         service = EnrichmentService(
@@ -809,10 +908,17 @@ class TestCommitVerificationEnrichment:
         """Test commit verification enrichment with cache miss."""
         mock_cache = AsyncMock()
         mock_cache.get_commit_verification.return_value = None
-        mock_cache.cache_stats = {"hits": 0, "misses": 1, "total_requests": 1, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 1,
+            "total_requests": 1,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
-        mock_graphql_client.get_commit_verification.return_value = sample_commit_verification
+        mock_graphql_client.get_commit_verification.return_value = (
+            sample_commit_verification
+        )
 
         service = EnrichmentService(
             graphql_client=mock_graphql_client,
@@ -828,7 +934,9 @@ class TestCommitVerificationEnrichment:
         mock_graphql_client.get_commit_verification.assert_called_once_with(
             "testowner", "testrepo", "abc123"
         )
-        mock_cache.set_commit_verification.assert_called_once_with(sample_commit_verification)
+        mock_cache.set_commit_verification.assert_called_once_with(
+            sample_commit_verification
+        )
 
 
 @pytest.mark.unit
@@ -837,11 +945,18 @@ class TestCacheCleanupAndStats:
 
     @pytest.mark.asyncio
     @patch("service.enrichment_service.EnrichmentCacheManager")
-    async def test_cleanup_cache(self, mock_cache_class, mock_graphql_client, mock_db_session):
+    async def test_cleanup_cache(
+        self, mock_cache_class, mock_graphql_client, mock_db_session
+    ):
         """Test cache cleanup operation."""
         mock_cache = AsyncMock()
         mock_cache.cleanup_expired.return_value = 42
-        mock_cache.cache_stats = {"hits": 0, "misses": 0, "total_requests": 0, "hit_rate": 0.0}
+        mock_cache.cache_stats = {
+            "hits": 0,
+            "misses": 0,
+            "total_requests": 0,
+            "hit_rate": 0.0,
+        }
         mock_cache_class.return_value = mock_cache
 
         service = EnrichmentService(
@@ -856,7 +971,9 @@ class TestCacheCleanupAndStats:
         mock_cache.cleanup_expired.assert_called_once()
 
     @patch("service.enrichment_service.EnrichmentCacheManager")
-    def test_stats_property(self, mock_cache_class, mock_graphql_client, mock_db_session):
+    def test_stats_property(
+        self, mock_cache_class, mock_graphql_client, mock_db_session
+    ):
         """Test stats property aggregation."""
         mock_cache = AsyncMock()
         mock_cache.cache_stats = {

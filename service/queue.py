@@ -63,7 +63,9 @@ def enqueue_anomaly_summarization(
         anomaly_score=anomaly_score,
         suspicious_patterns=suspicious_patterns,
         job_timeout="5m",  # 5 minute timeout for AI API calls
-        retry=Retry(max=3, interval=[10, 30, 60]),  # Retry up to 3 times with exponential backoff
+        retry=Retry(
+            max=3, interval=[10, 30, 60]
+        ),  # Retry up to 3 times with exponential backoff
         failure_ttl=86400,  # Keep failed jobs for 24 hours for debugging
     )
 

@@ -649,8 +649,16 @@ class TestWorkflowStatusEnrichment:
                                 "status": "COMPLETED",
                                 "checkRuns": {
                                     "nodes": [
-                                        {"name": "test", "conclusion": "SUCCESS", "status": "COMPLETED"},
-                                        {"name": "lint", "conclusion": "SUCCESS", "status": "COMPLETED"},
+                                        {
+                                            "name": "test",
+                                            "conclusion": "SUCCESS",
+                                            "status": "COMPLETED",
+                                        },
+                                        {
+                                            "name": "lint",
+                                            "conclusion": "SUCCESS",
+                                            "status": "COMPLETED",
+                                        },
                                     ]
                                 },
                             },
@@ -659,7 +667,11 @@ class TestWorkflowStatusEnrichment:
                                 "status": "COMPLETED",
                                 "checkRuns": {
                                     "nodes": [
-                                        {"name": "build", "conclusion": "FAILURE", "status": "COMPLETED"}
+                                        {
+                                            "name": "build",
+                                            "conclusion": "FAILURE",
+                                            "status": "COMPLETED",
+                                        }
                                     ]
                                 },
                             },
@@ -699,7 +711,11 @@ class TestWorkflowStatusEnrichment:
                                 "status": "IN_PROGRESS",
                                 "checkRuns": {
                                     "nodes": [
-                                        {"name": "test", "conclusion": None, "status": "IN_PROGRESS"}
+                                        {
+                                            "name": "test",
+                                            "conclusion": None,
+                                            "status": "IN_PROGRESS",
+                                        }
                                     ]
                                 },
                             }
@@ -786,9 +802,14 @@ class TestCommitVerification:
             client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
         ):
             with patch.object(
-                client, "_fetch_commit_patch_rest", new_callable=AsyncMock, return_value="diff content"
+                client,
+                "_fetch_commit_patch_rest",
+                new_callable=AsyncMock,
+                return_value="diff content",
             ):
-                verification = await client.get_commit_verification("owner", "repo", "abc123")
+                verification = await client.get_commit_verification(
+                    "owner", "repo", "abc123"
+                )
 
         assert verification is not None
         assert verification.repository == "owner/repo"
@@ -824,9 +845,14 @@ class TestCommitVerification:
             client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
         ):
             with patch.object(
-                client, "_fetch_commit_patch_rest", new_callable=AsyncMock, return_value="small diff"
+                client,
+                "_fetch_commit_patch_rest",
+                new_callable=AsyncMock,
+                return_value="small diff",
             ):
-                verification = await client.get_commit_verification("owner", "repo", "def456")
+                verification = await client.get_commit_verification(
+                    "owner", "repo", "def456"
+                )
 
         assert verification is not None
         assert verification.is_signed is False
@@ -859,9 +885,14 @@ class TestCommitVerification:
             client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
         ):
             with patch.object(
-                client, "_fetch_commit_patch_rest", new_callable=AsyncMock, return_value=high_entropy_patch
+                client,
+                "_fetch_commit_patch_rest",
+                new_callable=AsyncMock,
+                return_value=high_entropy_patch,
             ):
-                verification = await client.get_commit_verification("owner", "repo", "xyz789")
+                verification = await client.get_commit_verification(
+                    "owner", "repo", "xyz789"
+                )
 
         assert verification is not None
         assert verification.commit_entropy is not None
@@ -891,12 +922,19 @@ class TestCommitVerification:
             client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
         ):
             with patch.object(
-                client, "_fetch_commit_patch_rest", new_callable=AsyncMock, side_effect=Exception("Timeout")
+                client,
+                "_fetch_commit_patch_rest",
+                new_callable=AsyncMock,
+                side_effect=Exception("Timeout"),
             ):
-                verification = await client.get_commit_verification("owner", "repo", "error123")
+                verification = await client.get_commit_verification(
+                    "owner", "repo", "error123"
+                )
 
         assert verification is not None
-        assert verification.commit_entropy is None  # Entropy calculation failed gracefully
+        assert (
+            verification.commit_entropy is None
+        )  # Entropy calculation failed gracefully
 
     @pytest.mark.asyncio
     async def test_get_commit_verification_no_commit_found(self):
@@ -908,6 +946,8 @@ class TestCommitVerification:
         with patch.object(
             client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
         ):
-            verification = await client.get_commit_verification("owner", "repo", "notfound")
+            verification = await client.get_commit_verification(
+                "owner", "repo", "notfound"
+            )
 
         assert verification is None

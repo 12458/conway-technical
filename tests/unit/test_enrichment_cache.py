@@ -264,9 +264,15 @@ class TestRepositoryContextCache:
 
         assert restored_context.owner == sample_repository_context.owner
         assert restored_context.name == sample_repository_context.name
-        assert restored_context.stargazer_count == sample_repository_context.stargazer_count
+        assert (
+            restored_context.stargazer_count
+            == sample_repository_context.stargazer_count
+        )
         assert restored_context.topics == sample_repository_context.topics
-        assert restored_context.has_security_policy == sample_repository_context.has_security_policy
+        assert (
+            restored_context.has_security_policy
+            == sample_repository_context.has_security_policy
+        )
 
 
 @pytest.mark.unit
@@ -295,9 +301,15 @@ class TestWorkflowStatusCache:
 
         assert restored_status.repository == sample_workflow_status.repository
         assert restored_status.commit_sha == sample_workflow_status.commit_sha
-        assert restored_status.total_check_suites == sample_workflow_status.total_check_suites
+        assert (
+            restored_status.total_check_suites
+            == sample_workflow_status.total_check_suites
+        )
         assert restored_status.check_runs == sample_workflow_status.check_runs
-        assert restored_status.overall_conclusion == sample_workflow_status.overall_conclusion
+        assert (
+            restored_status.overall_conclusion
+            == sample_workflow_status.overall_conclusion
+        )
 
     def test_empty_check_runs(self, fixed_time):
         """Test handling empty check runs list."""
@@ -349,7 +361,10 @@ class TestCommitVerificationCache:
         assert restored_verification.sha == sample_commit_verification.sha
         assert restored_verification.is_signed == sample_commit_verification.is_signed
         assert restored_verification.additions == sample_commit_verification.additions
-        assert restored_verification.commit_entropy == sample_commit_verification.commit_entropy
+        assert (
+            restored_verification.commit_entropy
+            == sample_commit_verification.commit_entropy
+        )
 
 
 @pytest.mark.unit
@@ -512,7 +527,9 @@ class TestEnrichmentCacheManager:
         assert manager._cache_misses == 1
 
     @pytest.mark.asyncio
-    async def test_set_repository_context(self, mock_session, sample_repository_context):
+    async def test_set_repository_context(
+        self, mock_session, sample_repository_context
+    ):
         """Test storing repository context in cache."""
         # Arrange
         manager = EnrichmentCacheManager(mock_session)
@@ -539,7 +556,9 @@ class TestEnrichmentCacheManager:
 
         # Act
         with patch("github_client.enrichment_cache.utc_now", return_value=fixed_time):
-            status = await manager.get_workflow_status("testowner/testrepo", "abc123def456")
+            status = await manager.get_workflow_status(
+                "testowner/testrepo", "abc123def456"
+            )
 
         # Assert
         assert status is not None
@@ -566,7 +585,9 @@ class TestEnrichmentCacheManager:
 
         # Act
         with patch("github_client.enrichment_cache.utc_now", return_value=fixed_time):
-            status = await manager.get_workflow_status("testowner/testrepo", "abc123def456")
+            status = await manager.get_workflow_status(
+                "testowner/testrepo", "abc123def456"
+            )
 
         # Assert
         assert status is None  # Expired
@@ -656,7 +677,9 @@ class TestEnrichmentCacheManager:
         assert manager._cache_misses == 0
 
     @pytest.mark.asyncio
-    async def test_set_commit_verification(self, mock_session, sample_commit_verification):
+    async def test_set_commit_verification(
+        self, mock_session, sample_commit_verification
+    ):
         """Test storing commit verification in cache."""
         # Arrange
         manager = EnrichmentCacheManager(mock_session)

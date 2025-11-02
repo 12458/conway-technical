@@ -87,9 +87,7 @@ class StreamingAnomalyDetector(BaseAnomalyDetector):
             return None, [], None, 0.0, False, "Event filtered"
 
         # Calculate anomaly score using RRCF with base class method
-        avg_codisp = self._process_rrcf_trees(
-            self.forest, features, self.point_index
-        )
+        avg_codisp = self._process_rrcf_trees(self.forest, features, self.point_index)
 
         # Increment point index
         self.point_index += 1
@@ -122,12 +120,14 @@ class StreamingAnomalyDetector(BaseAnomalyDetector):
         stats = super().get_stats()
 
         # Add detector-specific stats
-        stats.update({
-            "points_processed": self.point_index,
-            "avg_tree_size": avg_tree_size,
-            "total_actors_tracked": len(self.extractor.actor_event_counts),
-            "total_repos_tracked": len(self.extractor.repo_event_counts),
-        })
+        stats.update(
+            {
+                "points_processed": self.point_index,
+                "avg_tree_size": avg_tree_size,
+                "total_actors_tracked": len(self.extractor.actor_event_counts),
+                "total_repos_tracked": len(self.extractor.repo_event_counts),
+            }
+        )
 
         return stats
 
@@ -290,16 +290,18 @@ class MultiForestAnomalyDetector(BaseAnomalyDetector):
         stats = super().get_stats()
 
         # Add multi-forest specific stats
-        stats.update({
-            "num_forest_groups": len(self.detectors),
-            "num_trees_per_group": self.num_trees,
-            "total_trees": total_trees,
-            "total_points": total_points,
-            "avg_tree_size": total_points / total_trees if total_trees > 0 else 0,
-            "total_actors_tracked": len(self.extractor.actor_event_counts),
-            "total_repos_tracked": len(self.extractor.repo_event_counts),
-            "forest_stats": forest_stats,
-        })
+        stats.update(
+            {
+                "num_forest_groups": len(self.detectors),
+                "num_trees_per_group": self.num_trees,
+                "total_trees": total_trees,
+                "total_points": total_points,
+                "avg_tree_size": total_points / total_trees if total_trees > 0 else 0,
+                "total_actors_tracked": len(self.extractor.actor_event_counts),
+                "total_repos_tracked": len(self.extractor.repo_event_counts),
+                "forest_stats": forest_stats,
+            }
+        )
 
         return stats
 
