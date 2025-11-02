@@ -99,10 +99,10 @@ async def summarize_anomaly_job(
         else:
             # Fallback to basic summarization without enrichment
             if not service_settings.enrichment_enabled:
-                logger.info(f"Enrichment disabled, using basic summarization")
+                logger.info("Enrichment disabled, using basic summarization")
             elif not service_settings.github_graphql_token:
                 logger.warning(
-                    f"GraphQL token not configured, using basic summarization"
+                    "GraphQL token not configured, using basic summarization"
                 )
 
             # Generate AI summary without enrichment
