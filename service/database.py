@@ -236,15 +236,18 @@ database_url = service_settings.database_url
 if database_url.startswith("postgresql://"):
     database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     # asyncpg doesn't support sslmode or channel_binding query params, use ssl=require instead
-    if "sslmode=" in database_url:
+    if "sslmode=" in database_url or "channel_binding=" in database_url:
         import re
 
-        # Remove sslmode and channel_binding params, add ssl=require
+        # Remove sslmode and channel_binding params
         database_url = re.sub(r"[&?]sslmode=[^&]*", "", database_url)
         database_url = re.sub(r"[&?]channel_binding=[^&]*", "", database_url)
-        # Add ssl=require
-        separator = "&" if "?" in database_url else "?"
-        database_url = database_url + separator + "ssl=require"
+        # Clean up any trailing ? or &
+        database_url = re.sub(r"[?&]$", "", database_url)
+        # Add ssl=require if not present
+        if "ssl=" not in database_url:
+            separator = "&" if "?" in database_url else "?"
+            database_url = database_url + separator + "ssl=require"
 elif database_url.startswith("sqlite+aiosqlite"):
     pass  # Already correct
 elif database_url.startswith("sqlite://"):

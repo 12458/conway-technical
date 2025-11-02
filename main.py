@@ -116,13 +116,17 @@ def run_api_server(host: str, port: int):
     """
     logger.info(f"Starting FastAPI server on {host}:{port}")
 
-    uvicorn.run(
-        "service.app:app",
-        host=host,
-        port=port,
-        log_level="info",
-        access_log=True,
-    )
+    try:
+        uvicorn.run(
+            "service.app:app",
+            host=host,
+            port=port,
+            log_level="info",
+            access_log=True,
+        )
+    except Exception as e:
+        logger.exception(f"Failed to start FastAPI server: {e}")
+        raise
 
 
 def main():

@@ -11,4 +11,8 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY --from=builder /app/.venv .venv/
 COPY . .
+
+# Ensure config directory exists and is readable
+RUN ls -la config/ || echo "WARNING: config directory not found"
+
 CMD ["/app/.venv/bin/python", "main.py", "--host", "0.0.0.0"]

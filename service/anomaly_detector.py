@@ -305,9 +305,14 @@ class MultiForestAnomalyDetector(BaseAnomalyDetector):
 
 
 # Global detector instance (use multi-forest if enabled, otherwise single forest)
-if service_settings.enable_multi_forest:
-    detector = MultiForestAnomalyDetector()
-    logger.info("Using MultiForestAnomalyDetector with event-type-specific forests")
-else:
-    detector = StreamingAnomalyDetector()
-    logger.info("Using single StreamingAnomalyDetector (multi-forest disabled)")
+logger.info("Initializing anomaly detector...")
+try:
+    if service_settings.enable_multi_forest:
+        detector = MultiForestAnomalyDetector()
+        logger.info("Using MultiForestAnomalyDetector with event-type-specific forests")
+    else:
+        detector = StreamingAnomalyDetector()
+        logger.info("Using single StreamingAnomalyDetector (multi-forest disabled)")
+except Exception as e:
+    logger.exception(f"Failed to initialize detector: {e}")
+    raise

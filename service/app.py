@@ -13,7 +13,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, func, select
 
 from service.anomaly_detector import detector
-from service.database import AnomalySummary, AsyncSessionLocal, init_db
+from service.database import AnomalySummary, AsyncSessionLocal
 from service.poller import poller
 from service.queue import get_queue_stats
 from service.sse_models import AnomalyMessage, ConnectedMessage
@@ -85,17 +85,22 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting application")
 
-    # Initialize database
-    await init_db()
-    logger.info("Database initialized")
+    try:
+        # Database tables are created via Alembic migrations, not at startup
+        logger.info("Database connection configured (migrations handle schema)")
 
-    # Start background poller
-    poller_task = asyncio.create_task(poller.start())
-    logger.info("Background poller started")
+        # Start background poller
+        logger.info("Starting background poller...")
+        poller_task = asyncio.create_task(poller.start())
+        logger.info("Background poller started")
 
-    # Start summary broadcaster (polls DB for new summaries)
-    broadcaster_task = asyncio.create_task(_summary_broadcaster())
-    logger.info("Summary broadcaster started")
+        # Start summary broadcaster (polls DB for new summaries)
+        logger.info("Starting summary broadcaster...")
+        broadcaster_task = asyncio.create_task(_summary_broadcaster())
+        logger.info("Summary broadcaster started")
+    except Exception as e:
+        logger.exception(f"Failed to start application: {e}")
+        raise
 
     yield
 
