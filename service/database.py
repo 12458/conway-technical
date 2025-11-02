@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, deferred
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from service.config import service_settings
 
@@ -147,13 +147,13 @@ class AnomalySummary(Base):
         String(500), nullable=True
     )  # LLM explanation for severity
 
-    # Structured summary (deferred for performance)
-    root_cause: Mapped[list[str]] = mapped_column(JSON, deferred=True)  # 3-5 bullets
-    impact: Mapped[list[str]] = mapped_column(JSON, deferred=True)  # 3-5 bullets
-    next_steps: Mapped[list[str]] = mapped_column(JSON, deferred=True)  # 3-5 bullets
+    # Structured summary
+    root_cause: Mapped[list[str]] = mapped_column(JSON)  # 3-5 bullets
+    impact: Mapped[list[str]] = mapped_column(JSON)  # 3-5 bullets
+    next_steps: Mapped[list[str]] = mapped_column(JSON)  # 3-5 bullets
 
-    # Context (deferred for performance)
-    suspicious_patterns: Mapped[list[str]] = mapped_column(JSON, deferred=True)
+    # Context
+    suspicious_patterns: Mapped[list[str]] = mapped_column(JSON)
     anomaly_score: Mapped[float] = mapped_column(Float)
 
     # Event context
@@ -161,8 +161,8 @@ class AnomalySummary(Base):
     actor_login: Mapped[str] = mapped_column(String(100), index=True)
     repo_name: Mapped[str] = mapped_column(String(200), index=True)
 
-    # Raw event data for frontend display (deferred for performance)
-    raw_event: Mapped[dict[str, Any]] = mapped_column(JSON, deferred=True)
+    # Raw event data for frontend display
+    raw_event: Mapped[dict[str, Any]] = mapped_column(JSON)
 
     # Timestamps
     event_timestamp: Mapped[datetime] = mapped_column(
@@ -172,8 +172,8 @@ class AnomalySummary(Base):
         DateTime(timezone=True), default=utc_now, index=True
     )
 
-    # Metadata (deferred for performance)
-    tags: Mapped[list[str]] = mapped_column(JSON, default=list, deferred=True)
+    # Metadata
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response.

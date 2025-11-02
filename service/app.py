@@ -11,7 +11,6 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, func, select
-from sqlalchemy.orm import undefer
 
 from service.anomaly_detector import detector
 from service.database import AnomalySummary, AsyncSessionLocal, init_db
@@ -171,19 +170,7 @@ async def get_summaries(
         List of anomaly summaries
     """
     async with AsyncSessionLocal() as session:
-        query = (
-            select(AnomalySummary)
-            .order_by(desc(AnomalySummary.created_at))
-            .options(
-                # Eagerly load deferred columns for complete response
-                undefer(AnomalySummary.root_cause),
-                undefer(AnomalySummary.impact),
-                undefer(AnomalySummary.next_steps),
-                undefer(AnomalySummary.suspicious_patterns),
-                undefer(AnomalySummary.raw_event),
-                undefer(AnomalySummary.tags),
-            )
-        )
+        query = select(AnomalySummary).order_by(desc(AnomalySummary.created_at))
 
         # Apply filters
         if since:
@@ -320,7 +307,6 @@ async def _summary_broadcaster():
                     select(AnomalySummary)
                     .where(AnomalySummary.id > last_id)
                     .order_by(AnomalySummary.id)
-                    .options(undefer("*"))
                 )
                 new_summaries = result.scalars().all()
 
