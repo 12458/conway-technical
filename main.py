@@ -176,14 +176,25 @@ def main():
         service_settings.ai_provider == "anthropic"
         and not service_settings.anthropic_api_key
     ):
-        logger.warning("⚠️  Anthropic API key not set - will use fallback summaries")
+        logger.warning("⚠️  Anthropic API key not set - summarization will fail")
     elif (
         service_settings.ai_provider == "openai" and not service_settings.openai_api_key
     ):
-        logger.warning("⚠️  OpenAI API key not set - will use fallback summaries")
+        logger.warning("⚠️  OpenAI API key not set - summarization will fail")
 
     if not service_settings.github_token:
         logger.warning("⚠️  GitHub token not set - rate limits will be stricter")
+
+    # Validate required GraphQL token for enrichment
+    if not service_settings.github_graphql_token:
+        logger.error(
+            "❌ GitHub GraphQL token is required for anomaly summarization.\n"
+            "   Set SERVICE_GITHUB_GRAPHQL_TOKEN environment variable.\n"
+            "   Required scopes: repo, read:org, read:user"
+        )
+        sys.exit(1)
+
+    logger.info("✓ GitHub GraphQL token configured")
 
     # Clean up any stale workers from previous runs
     cleanup_stale_workers()

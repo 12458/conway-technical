@@ -12,8 +12,7 @@ class ServiceSettings(BaseSettings):
         default=None,
         description="GitHub personal access token for authentication",
     )
-    github_graphql_token: str | None = Field(
-        default=None,
+    github_graphql_token: str = Field(
         description="GitHub token for GraphQL API enrichment (requires repo, read:org, read:user scopes)",
     )
 
@@ -176,10 +175,6 @@ class ServiceSettings(BaseSettings):
     )
 
     # GraphQL Enrichment settings
-    enrichment_enabled: bool = Field(
-        default=True,
-        description="Enable GraphQL enrichment for detected anomalies",
-    )
     enrichment_batch_size: int = Field(
         default=10,
         description="Maximum number of enrichments to batch together",

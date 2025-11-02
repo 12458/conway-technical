@@ -29,8 +29,7 @@ primary_region = 'iad'
   SERVICE_WORKER_COUNT = "2"
   SERVICE_QUEUE_NAME = "github-anomalies"
 
-  # Feature Flags
-  SERVICE_ENRICHMENT_ENABLED = "true"
+  # GraphQL Enrichment Configuration
   SERVICE_ENRICHMENT_BATCH_SIZE = "10"
   SERVICE_ENRICHMENT_TIMEOUT_MS = "5000"
 

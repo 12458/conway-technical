@@ -30,6 +30,7 @@ A complete background polling service for GitHub Events API with:
 - Redis URL (Upstash provided in .env.example)
 - AI API key (Anthropic or OpenAI)
 - GitHub token (optional, for higher rate limits)
+- **GitHub GraphQL token (REQUIRED)** - See configuration section below
 
 ### Setup (5 minutes)
 
@@ -208,8 +209,8 @@ graph TD
 #### 7. AI Summarization (`service/summarizer.py`)
 - RQ worker job: `summarize_anomaly_job()`
 - Supports **Anthropic Claude** and **OpenAI GPT**
-- Generates structured summaries with enriched context
-- **Fallback summaries** when AI unavailable
+- Always uses enriched context from GraphQL data
+- Generates structured summaries with risk-based severity
 - Saves to database and broadcasts via SSE
 
 #### 8. FastAPI Application (`service/app.py`)
@@ -301,19 +302,18 @@ Enrichment data influences final severity classification:
 
 #### Configuration
 
-Enable GraphQL enrichment by setting environment variables:
+GraphQL enrichment is **mandatory** and requires a GitHub token:
 
 ```bash
-# Required: GitHub token with appropriate scopes
+# REQUIRED: GitHub token with appropriate scopes
 SERVICE_GITHUB_GRAPHQL_TOKEN=ghp_xxxxxxxxxxxx  # Requires: repo, read:org, read:user
-
-# Optional: Feature flag
-SERVICE_ENRICHMENT_ENABLED=true  # Default: true
 
 # Optional: Performance tuning
 SERVICE_ENRICHMENT_BATCH_SIZE=10         # Default: 10
 SERVICE_ENRICHMENT_TIMEOUT_MS=5000       # Default: 5000
 ```
+
+**Note:** The service will not start without a valid GraphQL token. Enrichment is always enabled to ensure high-quality security analysis.
 
 ### Real-time Processing
 
@@ -566,7 +566,7 @@ All settings can be configured via environment variables with the `SERVICE_` pre
 
 ### GitHub API
 - `SERVICE_GITHUB_TOKEN`: Personal access token (optional, increases rate limit from 60 to 5000 req/hr)
-- `SERVICE_GITHUB_GRAPHQL_TOKEN`: Token for GraphQL enrichment (requires: repo, read:org, read:user)
+- `SERVICE_GITHUB_GRAPHQL_TOKEN`: **REQUIRED** - Token for GraphQL enrichment (requires: repo, read:org, read:user)
 
 ### Redis
 - `SERVICE_REDIS_URL`: Redis connection URL (default: `redis://localhost:6379`)
@@ -588,7 +588,6 @@ All settings can be configured via environment variables with the `SERVICE_` pre
 - `SERVICE_ENABLE_BOT_FILTERING`: Filter known bots (default: true)
 
 ### GraphQL Enrichment
-- `SERVICE_ENRICHMENT_ENABLED`: Enable enrichment (default: true)
 - `SERVICE_ENRICHMENT_BATCH_SIZE`: Batch size for queries (default: 10)
 - `SERVICE_ENRICHMENT_TIMEOUT_MS`: Query timeout (default: 5000)
 
@@ -774,8 +773,7 @@ conway/
 - SSE streaming for live updates
 - Health checks and metrics
 - AI summarization (Claude/GPT)
-- Structured JSON output
-- Fallback to rule-based summaries
+- Structured JSON output with enriched context
 - Environment-based configuration
 - Graceful shutdown
 - Error handling and retries

@@ -41,8 +41,8 @@ class TestConfiguration:
     def test_ai_api_key_configured(self):
         """Test that OpenAI API key is configured."""
         # Check for OpenAI key
-        # Note: This test will pass even if no key is set, as the service can use fallback summaries
+        # Note: This test will pass even if no key is set, but summarization will fail without it
         has_ai_key = service_settings.openai_api_key
-        # We don't assert True here because the service can work without AI keys (fallback mode)
+        # We don't assert True here to allow the service to start for event collection/detection only
         # Just verify the field exists
         assert hasattr(service_settings, "openai_api_key")
