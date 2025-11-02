@@ -17,14 +17,9 @@ from collections import deque
 import numpy as np
 import pytest
 
-from github_client.feature_extractor import (
-    GitHubFeatureExtractor,
-    KNOWN_BOTS,
-    MAX_ACTORS,
-    MAX_REPOS,
-    MAX_TEXT_BYTES,
-)
+from github_client.feature_extractor import GitHubFeatureExtractor
 from github_client.models import Event, Actor, Repo, Organization
+from service.config import service_settings
 
 
 def create_test_event(
@@ -224,8 +219,8 @@ class TestTextNgramHashing:
         """Test that very long text is properly handled."""
         extractor = GitHubFeatureExtractor(ngram_size=4)
 
-        # Create text longer than MAX_TEXT_BYTES
-        long_text = "x" * (MAX_TEXT_BYTES + 1000)
+        # Create text longer than max_text_bytes
+        long_text = "x" * (extractor.max_text_bytes + 1000)
         vec = extractor._hash_text_ngrams(long_text, dim=32)
 
         # Should not crash and should produce valid output
@@ -263,7 +258,7 @@ class TestBotFiltering:
         """Test detection of known bot accounts."""
         extractor = GitHubFeatureExtractor(filter_bots=True)
 
-        for bot in list(KNOWN_BOTS)[:5]:  # Test first 5
+        for bot in list(extractor.known_bots)[:5]:  # Test first 5
             assert extractor.is_bot(bot) is True
 
     def test_is_bot_bracket_pattern(self):
@@ -307,51 +302,51 @@ class TestLRUEviction:
         """Test that oldest actors are evicted when limit is exceeded."""
         extractor = GitHubFeatureExtractor()
 
-        # Add MAX_ACTORS + 1 actors
-        for i in range(MAX_ACTORS + 5):
+        # Add max_actors + 1 actors
+        for i in range(extractor.max_actors + 5):
             actor = f"actor_{i}"
             extractor.actor_event_counts[actor] = 1.0
             extractor.actor_event_counts.move_to_end(actor)
             extractor.actor_last_seen[actor] = i
             extractor._evict_lru_actors()
 
-        # Should have exactly MAX_ACTORS actors
-        assert len(extractor.actor_event_counts) == MAX_ACTORS
+        # Should have exactly max_actors actors
+        assert len(extractor.actor_event_counts) == extractor.max_actors
 
         # First actors should be evicted
         assert "actor_0" not in extractor.actor_event_counts
         assert "actor_1" not in extractor.actor_event_counts
 
         # Recent actors should remain
-        assert f"actor_{MAX_ACTORS + 4}" in extractor.actor_event_counts
+        assert f"actor_{extractor.max_actors + 4}" in extractor.actor_event_counts
 
     def test_repo_lru_eviction(self):
         """Test that oldest repos are evicted when limit is exceeded."""
         extractor = GitHubFeatureExtractor()
 
-        # Add MAX_REPOS + 1 repos
-        for i in range(MAX_REPOS + 5):
+        # Add max_repos + 1 repos
+        for i in range(extractor.max_repos + 5):
             repo = f"owner/repo_{i}"
             extractor.repo_event_counts[repo] = 1.0
             extractor.repo_event_counts.move_to_end(repo)
             extractor.repo_last_seen[repo] = i
             extractor._evict_lru_repos()
 
-        # Should have exactly MAX_REPOS repos
-        assert len(extractor.repo_event_counts) == MAX_REPOS
+        # Should have exactly max_repos repos
+        assert len(extractor.repo_event_counts) == extractor.max_repos
 
         # First repos should be evicted
         assert "owner/repo_0" not in extractor.repo_event_counts
 
         # Recent repos should remain
-        assert f"owner/repo_{MAX_REPOS + 4}" in extractor.repo_event_counts
+        assert f"owner/repo_{extractor.max_repos + 4}" in extractor.repo_event_counts
 
     def test_actor_eviction_cleans_all_data(self):
         """Test that actor eviction cleans all associated data structures."""
         extractor = GitHubFeatureExtractor()
 
         # Set up actor with data in all structures
-        for i in range(MAX_ACTORS + 1):
+        for i in range(extractor.max_actors + 1):
             actor = f"actor_{i}"
             extractor.actor_event_counts[actor] = 1.0
             extractor.actor_last_seen[actor] = i

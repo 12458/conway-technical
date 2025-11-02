@@ -8,67 +8,37 @@ All features use proper encoding for RRCF:
 - Normalization: z-score using Welford's algorithm
 """
 
+import json
 from collections import OrderedDict, defaultdict
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import xxhash
 
 from github_client.models import Event
+from github_client.utils import extract_timestamp
+from service.config import service_settings
 
-# Memory limits for LRU eviction
-MAX_ACTORS = 50_000
-MAX_REPOS = 25_000
-MAX_TEXT_BYTES = 2048  # 2KB text limit
 
-# Known bot accounts to filter out
-KNOWN_BOTS = {
-    "github-actions[bot]",
-    "dependabot[bot]",
-    "coderabbitai[bot]",
-    "socket-security[bot]",
-    "renovate[bot]",
-    "greenkeeper[bot]",
-    "codecov[bot]",
-    "codecov-io",
-    "codecov-commenter",
-    "imgbot[bot]",
-    "snyk-bot",
-    "sonarcloud[bot]",
-    "renovate-bot",
-    "pyup-bot",
-    "mergify[bot]",
-    "restyled-io[bot]",
-    "vercel[bot]",
-    "netlify[bot]",
-    "github-advanced-security[bot]",
-    "microsoft-github-policy-service[bot]",
-    "allcontributors[bot]",
-    "semantic-release-bot",
-    "gitpod-io[bot]",
-    "codesandbox[bot]",
-    "pre-commit-ci[bot]",
-    "stale[bot]",
-    "fossabot",
-    "coveralls",
-    "lgtm-com[bot]",
-    "dependabot-preview[bot]",
-    "whitesource-bolt-for-github[bot]",
-    "sourcery-ai[bot]",
-    "deepsource-autofix[bot]",
-    "sweep-ai[bot]",
-    "linear[bot]",
-    "gitguardian[bot]",
-    "copilot[bot]",
-    # Additional bots for moderate filtering
-    "cloudflare-workers-and-pages[bot]",
-    "release-please[bot]",
-    "TheBoatyMcBotFace",  # Release-please style bot
-    "Copilot",  # GitHub Copilot SWE agent
-    "soc-se-bot",  # Educational institution bot
-    "cursoragent[bot]",
-    "gemini[bot]",
-}
+def _load_known_bots() -> set[str]:
+    """Load known bot accounts from config file.
+
+    Returns:
+        Set of known bot account names
+
+    Raises:
+        FileNotFoundError: If config file doesn't exist
+        json.JSONDecodeError: If config file is invalid JSON
+    """
+    config_path = Path(service_settings.known_bots_config_path)
+    if not config_path.exists():
+        # Fallback to empty set if file doesn't exist
+        return set()
+
+    with open(config_path) as f:
+        data = json.load(f)
+        return set(data.get("known_bots", []))
 
 
 class GitHubFeatureExtractor:
@@ -164,6 +134,12 @@ class GitHubFeatureExtractor:
         self.feature_mean = None
         self.feature_m2 = None  # Sum of squared differences from mean
 
+        # Load config values
+        self.max_actors = service_settings.max_actors_tracked
+        self.max_repos = service_settings.max_repos_tracked
+        self.max_text_bytes = service_settings.max_text_bytes
+        self.known_bots = _load_known_bots() if filter_bots else set()
+
     def _get_decayed_count(self, count: float, last_seen: int) -> float:
         """Compute decayed count using lazy decay.
 
@@ -179,7 +155,7 @@ class GitHubFeatureExtractor:
 
     def _evict_lru_actors(self) -> None:
         """Evict oldest actor if limit exceeded."""
-        if len(self.actor_event_counts) > MAX_ACTORS:
+        if len(self.actor_event_counts) > self.max_actors:
             # Remove oldest (first) item from OrderedDict
             oldest_actor = next(iter(self.actor_event_counts))
             del self.actor_event_counts[oldest_actor]
@@ -193,7 +169,7 @@ class GitHubFeatureExtractor:
 
     def _evict_lru_repos(self) -> None:
         """Evict oldest repo if limit exceeded."""
-        if len(self.repo_event_counts) > MAX_REPOS:
+        if len(self.repo_event_counts) > self.max_repos:
             oldest_repo = next(iter(self.repo_event_counts))
             del self.repo_event_counts[oldest_repo]
             self.repo_last_seen.pop(oldest_repo, None)
@@ -206,9 +182,9 @@ class GitHubFeatureExtractor:
             actor_login: Actor username to check
 
         Returns:
-            True if actor is in KNOWN_BOTS set or has '[bot]' in name
+            True if actor is in known_bots set or has '[bot]' in name
         """
-        return actor_login in KNOWN_BOTS or "[bot]" in actor_login.lower()
+        return actor_login in self.known_bots or "[bot]" in actor_login.lower()
 
     def _hash_categorical(self, value: str, dim: int, seed: int = 0) -> np.ndarray:
         """Hash a categorical value into a fixed-dimension one-hot vector.
@@ -254,10 +230,10 @@ class GitHubFeatureExtractor:
         if not text:
             return vec
 
-        # Clip text to MAX_TEXT_BYTES for performance
-        if len(text.encode("utf-8", errors="ignore")) > MAX_TEXT_BYTES:
+        # Clip text to max_text_bytes for performance
+        if len(text.encode("utf-8", errors="ignore")) > self.max_text_bytes:
             # Truncate at character boundary
-            text = text.encode("utf-8", errors="ignore")[:MAX_TEXT_BYTES].decode(
+            text = text.encode("utf-8", errors="ignore")[:self.max_text_bytes].decode(
                 "utf-8", errors="ignore"
             )
 
@@ -738,16 +714,8 @@ class GitHubFeatureExtractor:
         # Increment event counter for lazy decay
         self.total_events += 1
 
-        # Extract timestamp from event (created_at is already a datetime object)
-        import datetime
-
-        if isinstance(event.created_at, datetime.datetime):
-            event_timestamp = event.created_at.timestamp()
-        else:
-            # Fallback for string timestamps
-            event_timestamp = datetime.datetime.fromisoformat(
-                event.created_at.replace("Z", "+00:00")
-            ).timestamp()
+        # Extract timestamp from event
+        event_timestamp = extract_timestamp(event)
 
         # Update timestamp tracking for velocity and burst detection
         self._update_actor_timestamps(actor_login, event_timestamp)
@@ -1205,7 +1173,7 @@ def get_suspicious_patterns(
     """
     patterns = []
     actor_login = event.actor.login
-    is_bot = actor_login in KNOWN_BOTS
+    is_bot = actor_login in extractor.known_bots
 
     actor_stats = extractor.get_actor_stats(actor_login)
 

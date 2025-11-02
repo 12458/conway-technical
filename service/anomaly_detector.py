@@ -6,17 +6,15 @@ from typing import Any
 import numpy as np
 from newrrcf import RCTree
 
-from github_client.feature_extractor import (
-    GitHubFeatureExtractor,
-    get_suspicious_patterns,
-)
+from github_client.feature_extractor import GitHubFeatureExtractor
 from github_client.models import Event
+from service.anomaly_detector_base import BaseAnomalyDetector
 from service.config import service_settings
 
 logger = logging.getLogger(__name__)
 
 
-class StreamingAnomalyDetector:
+class StreamingAnomalyDetector(BaseAnomalyDetector):
     """Streaming anomaly detector using RRCF.
 
     Uses a forest of Robust Random Cut Trees to detect anomalies in real-time
@@ -38,10 +36,7 @@ class StreamingAnomalyDetector:
             shingle_size: Shingle size for streaming
             threshold: CoDisp score threshold for anomaly detection
         """
-        self.num_trees = num_trees or service_settings.num_trees
-        self.tree_size = tree_size or service_settings.tree_size
-        self.shingle_size = shingle_size or service_settings.shingle_size
-        self.threshold = threshold or service_settings.anomaly_threshold
+        super().__init__(num_trees, tree_size, shingle_size, threshold)
 
         # Initialize forest of trees
         self.forest: dict[int, RCTree] = {}
@@ -78,58 +73,23 @@ class StreamingAnomalyDetector:
             - is_inhuman_speed: True if velocity exceeds threshold
             - velocity_reason: Human-readable velocity explanation
         """
-        # Extract features
-        features = self.extractor.extract_features(event)
+        # Extract features and analyze event using base class method
+        (
+            features,
+            velocity_score,
+            is_inhuman_speed,
+            velocity_reason,
+            suspicious_patterns,
+        ) = self._extract_and_analyze_event(event, self.extractor)
 
-        # Check if event was filtered (e.g., bot)
+        # Check if event was filtered
         if features is None:
-            logger.debug(f"Event {event.id} filtered (likely bot: {event.actor.login})")
             return None, [], None, 0.0, False, "Event filtered"
 
-        # Extract timestamp for velocity detection
-        import datetime
-
-        if isinstance(event.created_at, datetime.datetime):
-            event_timestamp = event.created_at.timestamp()
-        else:
-            # Fallback for string timestamps
-            event_timestamp = datetime.datetime.fromisoformat(
-                event.created_at.replace("Z", "+00:00")
-            ).timestamp()
-
-        # Get velocity-based anomaly score
-        velocity_score, is_inhuman_speed, velocity_reason = (
-            self.extractor.get_velocity_anomaly_score(
-                event.actor.login, event_timestamp
-            )
+        # Calculate anomaly score using RRCF with base class method
+        avg_codisp = self._process_rrcf_trees(
+            self.forest, features, self.point_index
         )
-
-        # Get suspicious patterns using rule-based detection
-        suspicious_patterns = get_suspicious_patterns(event, self.extractor)
-
-        # Calculate anomaly score using RRCF
-        avg_codisp = 0.0
-
-        # Insert point into all trees and compute CoDisp
-        for tree_idx in self.forest:
-            tree = self.forest[tree_idx]
-
-            # Insert point
-            tree.insert_point(features, index=self.point_index)
-
-            # Compute CoDisp (collusive displacement)
-            codisp = tree.codisp(self.point_index)
-            avg_codisp += codisp
-
-            # Maintain tree size by forgetting oldest points
-            if len(tree.leaves) > self.tree_size:
-                # Forget oldest point (FIFO)
-                oldest_index = self.point_index - self.tree_size
-                if oldest_index in tree.leaves:
-                    tree.forget_point(oldest_index)
-
-        # Average CoDisp across all trees
-        avg_codisp /= self.num_trees
 
         # Increment point index
         self.point_index += 1
@@ -148,23 +108,6 @@ class StreamingAnomalyDetector:
             is_inhuman_speed,
             velocity_reason,
         )
-
-    def is_anomaly(
-        self, score: float, patterns: list[str], is_inhuman_speed: bool = False
-    ) -> bool:
-        """Check if event should be flagged as anomaly.
-
-        Args:
-            score: CoDisp score
-            patterns: Suspicious patterns detected (not used in detection)
-            is_inhuman_speed: Whether velocity-based detection flagged inhuman speed
-
-        Returns:
-            True if score exceeds threshold (velocity is tracked but does not bypass score requirement)
-        """
-        # Score threshold is a hard requirement
-        # Velocity detection is tracked for context but does not bypass the threshold
-        return score >= self.threshold
 
     def get_stats(self) -> dict[str, Any]:
         """Get detector statistics.
@@ -186,7 +129,7 @@ class StreamingAnomalyDetector:
         }
 
 
-class MultiForestAnomalyDetector:
+class MultiForestAnomalyDetector(BaseAnomalyDetector):
     """Multi-forest anomaly detector with event-type-specific forests.
 
     Maintains separate RRCF forests for different event type groups to prevent
@@ -208,10 +151,7 @@ class MultiForestAnomalyDetector:
             shingle_size: Shingle size for streaming
             threshold: CoDisp score threshold for anomaly detection
         """
-        self.num_trees = num_trees or service_settings.num_trees
-        self.tree_size = tree_size or service_settings.tree_size
-        self.shingle_size = shingle_size or service_settings.shingle_size
-        self.threshold = threshold or service_settings.anomaly_threshold
+        super().__init__(num_trees, tree_size, shingle_size, threshold)
 
         # Build event type to forest group mapping
         self.event_type_to_group: dict[str, str] = {}
@@ -281,58 +221,23 @@ class MultiForestAnomalyDetector:
         forest_group = self._get_forest_group(event.type)
         detector = self.detectors[forest_group]
 
-        # Extract features using shared extractor
-        features = self.extractor.extract_features(event)
+        # Extract features and analyze event using base class method
+        (
+            features,
+            velocity_score,
+            is_inhuman_speed,
+            velocity_reason,
+            suspicious_patterns,
+        ) = self._extract_and_analyze_event(event, self.extractor)
 
-        # Check if event was filtered (e.g., bot)
+        # Check if event was filtered
         if features is None:
-            logger.debug(f"Event {event.id} filtered (likely bot: {event.actor.login})")
             return None, [], None, 0.0, False, "Event filtered"
 
-        # Extract timestamp for velocity detection
-        import datetime
-
-        if isinstance(event.created_at, datetime.datetime):
-            event_timestamp = event.created_at.timestamp()
-        else:
-            # Fallback for string timestamps
-            event_timestamp = datetime.datetime.fromisoformat(
-                event.created_at.replace("Z", "+00:00")
-            ).timestamp()
-
-        # Get velocity-based anomaly score
-        velocity_score, is_inhuman_speed, velocity_reason = (
-            self.extractor.get_velocity_anomaly_score(
-                event.actor.login, event_timestamp
-            )
+        # Calculate anomaly score using RRCF with base class method
+        avg_codisp = self._process_rrcf_trees(
+            detector.forest, features, detector.point_index
         )
-
-        # Get suspicious patterns using rule-based detection
-        suspicious_patterns = get_suspicious_patterns(event, self.extractor)
-
-        # Calculate anomaly score using RRCF in the appropriate forest
-        avg_codisp = 0.0
-
-        # Insert point into all trees in this forest and compute CoDisp
-        for tree_idx in detector.forest:
-            tree = detector.forest[tree_idx]
-
-            # Insert point
-            tree.insert_point(features, index=detector.point_index)
-
-            # Compute CoDisp (collusive displacement)
-            codisp = tree.codisp(detector.point_index)
-            avg_codisp += codisp
-
-            # Maintain tree size by forgetting oldest points
-            if len(tree.leaves) > self.tree_size:
-                # Forget oldest point (FIFO)
-                oldest_index = detector.point_index - self.tree_size
-                if oldest_index in tree.leaves:
-                    tree.forget_point(oldest_index)
-
-        # Average CoDisp across all trees
-        avg_codisp /= self.num_trees
 
         # Increment point index for this detector
         detector.point_index += 1
@@ -351,23 +256,6 @@ class MultiForestAnomalyDetector:
             is_inhuman_speed,
             velocity_reason,
         )
-
-    def is_anomaly(
-        self, score: float, patterns: list[str], is_inhuman_speed: bool = False
-    ) -> bool:
-        """Check if event should be flagged as anomaly.
-
-        Args:
-            score: CoDisp score
-            patterns: Suspicious patterns detected (not used in detection)
-            is_inhuman_speed: Whether velocity-based detection flagged inhuman speed
-
-        Returns:
-            True if score exceeds threshold (velocity is tracked but does not bypass score requirement)
-        """
-        # Score threshold is a hard requirement
-        # Velocity detection is tracked for context but does not bypass the threshold
-        return score >= self.threshold
 
     def get_stats(self) -> dict[str, Any]:
         """Get detector statistics across all forests.

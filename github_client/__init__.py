@@ -13,6 +13,7 @@ from .exceptions import (
     ValidationError,
 )
 from .gharchive import GHArchiveLoader, LoaderStats
+from .utils import extract_timestamp
 from .models import (
     Actor,
     Commit,
@@ -56,6 +57,8 @@ __all__ = [
     # Config
     "Settings",
     "settings",
+    # Utilities
+    "extract_timestamp",
     # Exceptions
     "GitHubAPIError",
     "RateLimitError",

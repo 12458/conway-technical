@@ -89,6 +89,24 @@ class ServiceSettings(BaseSettings):
         description="Maximum number of timestamps to store per actor (memory limit)",
     )
 
+    # Feature extraction settings
+    max_actors_tracked: int = Field(
+        default=50_000,
+        description="Maximum number of actors to track in feature extractor (LRU eviction)",
+    )
+    max_repos_tracked: int = Field(
+        default=25_000,
+        description="Maximum number of repositories to track in feature extractor (LRU eviction)",
+    )
+    max_text_bytes: int = Field(
+        default=2048,
+        description="Maximum text bytes to process for feature extraction (2KB limit)",
+    )
+    known_bots_config_path: str = Field(
+        default="config/known_bots.json",
+        description="Path to JSON file containing list of known bot accounts to filter",
+    )
+
     # Event-type-specific RRCF forest settings
     enable_multi_forest: bool = Field(
         default=True,
