@@ -76,7 +76,7 @@ curl http://localhost:8000/stream
 
 ### What Happens Next
 
-1. **Poller starts** fetching GitHub events every 60 seconds
+1. **Poller starts** fetching GitHub events every 60 seconds (or longer as indicated by [`X-Poll-Interval`](https://docs.github.com/en/rest/activity/events?apiVersion=2022-11-28))
 2. **Anomaly detector** analyzes each event using RRCF
 3. **Anomalies** are saved to database and enqueued
 4. **GraphQL enrichment** adds actor/repo/workflow context
