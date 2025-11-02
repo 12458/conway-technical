@@ -3,7 +3,7 @@
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -314,7 +314,7 @@ AsyncSessionLocal = async_sessionmaker(
 logger.info("Database engine initialized with connection pooling")
 
 
-async def get_session() -> AsyncSession:
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """Get database session dependency for FastAPI.
 
     Yields:
