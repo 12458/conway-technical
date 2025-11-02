@@ -41,23 +41,6 @@ uv sync
 cp .env.example .env
 ```
 
-Edit `.env` and set:
-```bash
-# Required
-SERVICE_REDIS_URL=rediss://default:AXyyAAIncDJjZmNlZWRlZTQ2NjI0N2Y2YjRkOWUxZTI2NWYyNjkyN3AyMzE5MjI@promoted-crawdad-31922.upstash.io:6379
-
-# Choose one AI provider
-SERVICE_ANTHROPIC_API_KEY=sk-ant-...
-# OR
-SERVICE_OPENAI_API_KEY=sk-...
-
-# Optional (increases rate limit from 60 to 5000/hr)
-SERVICE_GITHUB_TOKEN=ghp_...
-
-# Optional (for GraphQL enrichment)
-SERVICE_GITHUB_GRAPHQL_TOKEN=ghp_...  # Requires: repo, read:org, read:user scopes
-```
-
 #### 3. Test Setup
 ```bash
 python test_service.py
