@@ -1,6 +1,7 @@
 """Base class for anomaly detectors with shared logic."""
 
 import logging
+from collections import deque
 from typing import Any
 
 import numpy as np
@@ -43,6 +44,15 @@ class BaseAnomalyDetector:
         self.tree_size = tree_size or service_settings.tree_size
         self.shingle_size = shingle_size or service_settings.shingle_size
         self.threshold = threshold or service_settings.anomaly_threshold
+
+        # Adaptive threshold tracking
+        self.enable_adaptive = service_settings.enable_adaptive_threshold
+        self.adaptive_percentile = service_settings.adaptive_percentile
+        self.min_samples = service_settings.min_samples_for_adaptive
+        self.recent_scores: deque[float] = deque(
+            maxlen=service_settings.adaptive_window_size
+        )
+        self.current_adaptive_threshold: float | None = None
 
     def _extract_and_analyze_event(
         self, event: Event, extractor: GitHubFeatureExtractor
@@ -123,6 +133,42 @@ class BaseAnomalyDetector:
 
         return avg_codisp
 
+    def _update_adaptive_threshold(self, score: float) -> None:
+        """Update the adaptive threshold with a new score.
+
+        Args:
+            score: CoDisp score to add to rolling window
+        """
+        if not self.enable_adaptive:
+            return
+
+        # Add score to rolling window
+        self.recent_scores.append(score)
+
+        # Calculate adaptive threshold if we have enough samples
+        if len(self.recent_scores) >= self.min_samples:
+            self.current_adaptive_threshold = float(
+                np.percentile(self.recent_scores, self.adaptive_percentile)
+            )
+            logger.debug(
+                f"Adaptive threshold updated: {self.current_adaptive_threshold:.2f} "
+                f"(based on {len(self.recent_scores)} scores, {self.adaptive_percentile}th percentile)"
+            )
+
+    def _get_effective_threshold(self) -> float:
+        """Get the current effective threshold for anomaly detection.
+
+        Returns:
+            The adaptive threshold if available and enabled, otherwise the static threshold
+        """
+        if (
+            self.enable_adaptive
+            and self.current_adaptive_threshold is not None
+            and len(self.recent_scores) >= self.min_samples
+        ):
+            return self.current_adaptive_threshold
+        return self.threshold
+
     def is_anomaly(
         self, score: float, patterns: list[str], is_inhuman_speed: bool = False
     ) -> bool:
@@ -136,9 +182,15 @@ class BaseAnomalyDetector:
         Returns:
             True if score exceeds threshold (velocity is tracked but does not bypass score requirement)
         """
+        # Update adaptive threshold with this score
+        self._update_adaptive_threshold(score)
+
+        # Get the effective threshold (adaptive or static)
+        effective_threshold = self._get_effective_threshold()
+
         # Score threshold is a hard requirement
         # Velocity detection is tracked for context but does not bypass the threshold
-        return score >= self.threshold
+        return score >= effective_threshold
 
     def get_stats(self) -> dict[str, Any]:
         """Get detector statistics.
@@ -149,8 +201,24 @@ class BaseAnomalyDetector:
         Returns:
             Dictionary with detector statistics
         """
-        return {
+        stats = {
             "num_trees": self.num_trees,
             "tree_size": self.tree_size,
-            "threshold": self.threshold,
+            "static_threshold": self.threshold,
         }
+
+        # Add adaptive threshold stats if enabled
+        if self.enable_adaptive:
+            stats["adaptive_threshold"] = {
+                "enabled": True,
+                "current_threshold": self.current_adaptive_threshold,
+                "effective_threshold": self._get_effective_threshold(),
+                "percentile_target": self.adaptive_percentile,
+                "scores_tracked": len(self.recent_scores),
+                "min_samples_warmup": self.min_samples,
+                "is_warmed_up": len(self.recent_scores) >= self.min_samples,
+            }
+        else:
+            stats["adaptive_threshold"] = {"enabled": False}
+
+        return stats

@@ -118,15 +118,18 @@ class StreamingAnomalyDetector(BaseAnomalyDetector):
         total_points = sum(len(tree.leaves) for tree in self.forest.values())
         avg_tree_size = total_points / self.num_trees if self.num_trees > 0 else 0
 
-        return {
-            "num_trees": self.num_trees,
-            "tree_size_limit": self.tree_size,
-            "threshold": self.threshold,
+        # Get base stats (includes adaptive threshold info)
+        stats = super().get_stats()
+
+        # Add detector-specific stats
+        stats.update({
             "points_processed": self.point_index,
             "avg_tree_size": avg_tree_size,
             "total_actors_tracked": len(self.extractor.actor_event_counts),
             "total_repos_tracked": len(self.extractor.repo_event_counts),
-        }
+        })
+
+        return stats
 
 
 class MultiForestAnomalyDetector(BaseAnomalyDetector):
@@ -272,25 +275,33 @@ class MultiForestAnomalyDetector(BaseAnomalyDetector):
             total_points += group_points
             total_trees += len(detector.forest)
 
+            # Get stats from each sub-detector (includes adaptive threshold)
+            sub_stats = detector.get_stats()
+
             forest_stats[group_name] = {
                 "points_processed": detector.point_index,
                 "avg_tree_size": group_points / len(detector.forest)
                 if detector.forest
                 else 0,
+                "adaptive_threshold": sub_stats.get("adaptive_threshold", {}),
             }
 
-        return {
+        # Get base stats (includes parent-level adaptive threshold config)
+        stats = super().get_stats()
+
+        # Add multi-forest specific stats
+        stats.update({
             "num_forest_groups": len(self.detectors),
             "num_trees_per_group": self.num_trees,
             "total_trees": total_trees,
-            "tree_size_limit": self.tree_size,
-            "threshold": self.threshold,
             "total_points": total_points,
             "avg_tree_size": total_points / total_trees if total_trees > 0 else 0,
             "total_actors_tracked": len(self.extractor.actor_event_counts),
             "total_repos_tracked": len(self.extractor.repo_event_counts),
             "forest_stats": forest_stats,
-        }
+        })
+
+        return stats
 
 
 # Global detector instance (use multi-forest if enabled, otherwise single forest)

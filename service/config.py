@@ -59,7 +59,7 @@ class ServiceSettings(BaseSettings):
     # Anomaly detection settings
     anomaly_threshold: float = Field(
         default=60.0,
-        description="CoDisp score threshold for anomaly detection",
+        description="CoDisp score threshold for anomaly detection (fallback for adaptive mode)",
     )
     tree_size: int = Field(
         default=256,
@@ -72,6 +72,24 @@ class ServiceSettings(BaseSettings):
     shingle_size: int = Field(
         default=1,
         description="Shingle size for streaming (1 = no shingling)",
+    )
+
+    # Adaptive threshold settings
+    enable_adaptive_threshold: bool = Field(
+        default=True,
+        description="Enable adaptive 95th percentile-based threshold (recommended)",
+    )
+    adaptive_window_size: int = Field(
+        default=1000,
+        description="Number of recent scores to track for adaptive threshold calculation",
+    )
+    adaptive_percentile: float = Field(
+        default=95.0,
+        description="Percentile to use for adaptive threshold (95.0 = top 5% flagged)",
+    )
+    min_samples_for_adaptive: int = Field(
+        default=100,
+        description="Minimum samples before enabling adaptive threshold (warm-up period)",
     )
 
     # Velocity-based anomaly detection settings
