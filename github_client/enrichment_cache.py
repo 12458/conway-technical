@@ -1,11 +1,11 @@
-"""SQLite cache layer for GraphQL enrichment data."""
+"""PostgreSQL cache layer for GraphQL enrichment data."""
 
 import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, select
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,7 +43,7 @@ class ActorProfileCache(Base):
     total_pr_contributions: Mapped[int] = mapped_column(Integer)
     total_issue_contributions: Mapped[int] = mapped_column(Integer)
     organizations: Mapped[str] = mapped_column(Text)  # JSON array as string
-    is_site_admin: Mapped[bool | None] = mapped_column(Integer, nullable=True)
+    is_site_admin: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     company: Mapped[str | None] = mapped_column(String(200), nullable=True)
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -64,7 +64,7 @@ class ActorProfileCache(Base):
             total_pr_contributions=self.total_pr_contributions,
             total_issue_contributions=self.total_issue_contributions,
             organizations=json.loads(self.organizations),
-            is_site_admin=bool(self.is_site_admin) if self.is_site_admin is not None else None,
+            is_site_admin=self.is_site_admin,
             company=self.company,
             location=self.location,
             bio=self.bio,
@@ -85,7 +85,7 @@ class ActorProfileCache(Base):
             total_pr_contributions=profile.total_pr_contributions,
             total_issue_contributions=profile.total_issue_contributions,
             organizations=json.dumps(profile.organizations),
-            is_site_admin=int(profile.is_site_admin) if profile.is_site_admin is not None else None,
+            is_site_admin=profile.is_site_admin,
             company=profile.company,
             location=profile.location,
             bio=profile.bio,
@@ -109,9 +109,9 @@ class RepositoryContextCache(Base):
     watcher_count: Mapped[int] = mapped_column(Integer)
     primary_language: Mapped[str | None] = mapped_column(String(50), nullable=True)
     default_branch: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    has_security_policy: Mapped[bool] = mapped_column(Integer)
-    is_fork: Mapped[bool] = mapped_column(Integer)
-    is_archived: Mapped[bool] = mapped_column(Integer)
+    has_security_policy: Mapped[bool] = mapped_column(Boolean)
+    is_fork: Mapped[bool] = mapped_column(Boolean)
+    is_archived: Mapped[bool] = mapped_column(Boolean)
     topics: Mapped[str] = mapped_column(Text)  # JSON array as string
     license_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
@@ -129,9 +129,9 @@ class RepositoryContextCache(Base):
             watcher_count=self.watcher_count,
             primary_language=self.primary_language,
             default_branch=self.default_branch,
-            has_security_policy=bool(self.has_security_policy),
-            is_fork=bool(self.is_fork),
-            is_archived=bool(self.is_archived),
+            has_security_policy=self.has_security_policy,
+            is_fork=self.is_fork,
+            is_archived=self.is_archived,
             topics=json.loads(self.topics),
             license_name=self.license_name,
             cached_at=self.cached_at,
@@ -149,9 +149,9 @@ class RepositoryContextCache(Base):
             watcher_count=context.watcher_count,
             primary_language=context.primary_language,
             default_branch=context.default_branch,
-            has_security_policy=int(context.has_security_policy),
-            is_fork=int(context.is_fork),
-            is_archived=int(context.is_archived),
+            has_security_policy=context.has_security_policy,
+            is_fork=context.is_fork,
+            is_archived=context.is_archived,
             topics=json.dumps(context.topics),
             license_name=context.license_name,
             cached_at=context.cached_at,
@@ -218,9 +218,9 @@ class CommitVerificationCache(Base):
     sha: Mapped[str] = mapped_column(String(40), primary_key=True)
 
     # Commit data
-    is_signed: Mapped[bool] = mapped_column(Integer)
+    is_signed: Mapped[bool] = mapped_column(Boolean)
     signer_login: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    signature_valid: Mapped[bool] = mapped_column(Integer)
+    signature_valid: Mapped[bool] = mapped_column(Boolean)
     additions: Mapped[int] = mapped_column(Integer)
     deletions: Mapped[int] = mapped_column(Integer)
     changed_files: Mapped[int] = mapped_column(Integer)
@@ -238,9 +238,9 @@ class CommitVerificationCache(Base):
         return CommitVerification(
             repository=self.repository,
             sha=self.sha,
-            is_signed=bool(self.is_signed),
+            is_signed=self.is_signed,
             signer_login=self.signer_login,
-            signature_valid=bool(self.signature_valid),
+            signature_valid=self.signature_valid,
             additions=self.additions,
             deletions=self.deletions,
             changed_files=self.changed_files,
@@ -258,9 +258,9 @@ class CommitVerificationCache(Base):
         return cls(
             repository=verification.repository,
             sha=verification.sha,
-            is_signed=int(verification.is_signed),
+            is_signed=verification.is_signed,
             signer_login=verification.signer_login,
-            signature_valid=int(verification.signature_valid),
+            signature_valid=verification.signature_valid,
             additions=verification.additions,
             deletions=verification.deletions,
             changed_files=verification.changed_files,

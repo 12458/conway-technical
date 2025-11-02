@@ -218,8 +218,26 @@ class AnomalySummary(Base):
 
 
 # Database engine and session
+# Convert database URL to use async driver if needed
+database_url = service_settings.database_url
+if database_url.startswith("postgresql://"):
+    database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    # asyncpg doesn't support sslmode or channel_binding query params, use ssl=require instead
+    if "sslmode=" in database_url:
+        import re
+        # Remove sslmode and channel_binding params, add ssl=require
+        database_url = re.sub(r'[&?]sslmode=[^&]*', '', database_url)
+        database_url = re.sub(r'[&?]channel_binding=[^&]*', '', database_url)
+        # Add ssl=require
+        separator = '&' if '?' in database_url else '?'
+        database_url = database_url + separator + 'ssl=require'
+elif database_url.startswith("sqlite+aiosqlite"):
+    pass  # Already correct
+elif database_url.startswith("sqlite://"):
+    database_url = database_url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+
 engine = create_async_engine(
-    service_settings.database_url,
+    database_url,
     echo=False,
     future=True,
 )
