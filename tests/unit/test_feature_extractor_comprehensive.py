@@ -641,3 +641,266 @@ class TestEdgeCases:
 
         assert features is not None
         assert len(features) > 0
+
+
+@pytest.mark.unit
+class TestVelocityAnomalyScoring:
+    """Tests for velocity-based anomaly detection."""
+
+    def test_velocity_normal_activity(self):
+        """Test velocity scoring for normal human activity."""
+        extractor = GitHubFeatureExtractor(filter_bots=False)
+
+        actor = "normaluser"
+        now = datetime.datetime.now(datetime.timezone.utc)
+
+        # Simulate normal activity: events spread over time
+        for i in range(5):
+            timestamp = (now + datetime.timedelta(minutes=i * 10)).timestamp()
+            extractor._update_actor_timestamps(actor, timestamp)
+
+        last_timestamp = (now + datetime.timedelta(minutes=50)).timestamp()
+        velocity_score, is_inhuman, reason = extractor.get_velocity_anomaly_score(
+            actor, last_timestamp
+        )
+
+        assert velocity_score < 100  # Normal velocity (< 100 events/min)
+        assert is_inhuman is False
+        # Reason can be None or contain explanation
+        if reason:
+            assert isinstance(reason, str)
+
+    def test_velocity_high_threshold_exceeded(self):
+        """Test velocity scoring when threshold is exceeded."""
+        extractor = GitHubFeatureExtractor(filter_bots=False)
+
+        actor = "fastactor"
+        now = datetime.datetime.now(datetime.timezone.utc)
+
+        # Simulate rapid activity: 50 events in 10 seconds
+        for i in range(50):
+            timestamp = (now + datetime.timedelta(seconds=i * 0.2)).timestamp()
+            extractor._update_actor_timestamps(actor, timestamp)
+
+        last_timestamp = (now + datetime.timedelta(seconds=10)).timestamp()
+        velocity_score, is_inhuman, reason = extractor.get_velocity_anomaly_score(
+            actor, last_timestamp
+        )
+
+        assert velocity_score > 100  # High velocity
+        assert is_inhuman is True
+        assert reason is not None
+
+    def test_velocity_empty_history(self):
+        """Test velocity scoring with no history."""
+        extractor = GitHubFeatureExtractor(filter_bots=False)
+
+        velocity_score, is_inhuman, reason = extractor.get_velocity_anomaly_score(
+            "newactor", 1000.0
+        )
+
+        # Should return 0 velocity for new actors
+        assert velocity_score == 0.0
+        assert is_inhuman is False
+
+
+@pytest.mark.unit
+class TestFeatureNormalization:
+    """Tests for Welford normalization algorithm."""
+
+    def test_welford_update(self):
+        """Test Welford algorithm updates running statistics."""
+        extractor = GitHubFeatureExtractor(filter_bots=False, normalize=True)
+
+        # Create features to update stats
+        features = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+
+        # Update multiple times
+        extractor._update_welford(features)
+        assert extractor.feature_count == 1
+        assert extractor.feature_mean is not None
+        assert extractor.feature_m2 is not None
+
+        extractor._update_welford(features)
+        assert extractor.feature_count == 2
+
+    def test_normalize_features_sufficient_data(self):
+        """Test z-score normalization with sufficient data."""
+        extractor = GitHubFeatureExtractor(filter_bots=False, normalize=True)
+
+        # Build up statistics
+        for _ in range(10):
+            features = np.array([5.0, 10.0, 15.0, 20.0])
+            extractor._update_welford(features)
+
+        # Now normalize
+        test_features = np.array([5.0, 10.0, 15.0, 20.0])
+        normalized = extractor._normalize_features(test_features)
+
+        assert normalized is not None
+        assert len(normalized) == len(test_features)
+
+    def test_normalize_features_insufficient_data(self):
+        """Test normalization fallback with insufficient data."""
+        extractor = GitHubFeatureExtractor(filter_bots=False, normalize=True)
+
+        # Only 1 sample - insufficient for normalization
+        features = np.array([1.0, 2.0, 3.0])
+        extractor._update_welford(features)
+
+        # Should return unnormalized features
+        normalized = extractor._normalize_features(features)
+        assert np.array_equal(normalized, features)
+
+
+@pytest.mark.unit
+class TestTemporalBurstDetection:
+    """Tests for temporal burst pattern detection."""
+
+    def test_burst_detection_multiple_bursts(self):
+        """Test burst detection with multiple burst periods."""
+        extractor = GitHubFeatureExtractor(filter_bots=False)
+
+        actor = "burstactor"
+        base_time = datetime.datetime.now(datetime.timezone.utc)
+
+        # Create bursts: 5 events in 10 seconds, then silence, then 5 more
+        for i in range(5):
+            timestamp = (base_time + datetime.timedelta(seconds=i * 2)).timestamp()
+            extractor._update_burst_tracking(actor, timestamp)
+
+        # Silence for 60 seconds
+        silence_time = base_time + datetime.timedelta(seconds=70)
+
+        # Another burst
+        for i in range(5):
+            timestamp = (silence_time + datetime.timedelta(seconds=i * 2)).timestamp()
+            extractor._update_burst_tracking(actor, timestamp)
+
+        last_timestamp = (silence_time + datetime.timedelta(seconds=20)).timestamp()
+        burst_features = extractor.get_temporal_burst_features(actor, last_timestamp)
+
+        # burst_features: [burst_count, silence_ratio, inter_event_cv]
+        assert burst_features[0] >= 0  # Burst count is valid
+        assert 0 <= burst_features[1] <= 1  # Silence ratio valid
+        assert burst_features[2] >= 0  # CV is non-negative
+        # Should have received timestamps
+        assert len(burst_features) == 3
+
+    def test_burst_features_single_event(self):
+        """Test burst features with single event."""
+        extractor = GitHubFeatureExtractor(filter_bots=False)
+
+        actor = "singleevent"
+        timestamp = 1000.0
+        extractor._update_burst_tracking(actor, timestamp)
+
+        burst_features = extractor.get_temporal_burst_features(actor, timestamp)
+
+        # Single event should have minimal burst features
+        assert burst_features[0] == 0  # No bursts yet
+        assert burst_features[1] >= 0
+        assert burst_features[2] >= 0
+
+
+@pytest.mark.unit
+class TestAdditionalEventTypes:
+    """Tests for remaining event type feature extraction."""
+
+    def test_delete_event_feature_extraction(self):
+        """Test DeleteEvent feature extraction (security-critical)."""
+        extractor = GitHubFeatureExtractor(filter_bots=False, normalize=False)
+
+        payload = {"ref": "feature-branch", "ref_type": "branch", "pusher_type": "user"}
+        event = create_test_event(
+            "DeleteEvent", "testuser", "owner/repo", payload=payload
+        )
+
+        features = extractor.extract_features(event)
+
+        assert features is not None
+        assert len(features) > 0
+
+    def test_create_event_feature_extraction(self):
+        """Test CreateEvent feature extraction."""
+        extractor = GitHubFeatureExtractor(filter_bots=False, normalize=False)
+
+        payload = {
+            "ref": "new-feature",
+            "ref_type": "branch",
+            "master_branch": "main",
+            "pusher_type": "user",
+        }
+        event = create_test_event(
+            "CreateEvent", "testuser", "owner/repo", payload=payload
+        )
+
+        features = extractor.extract_features(event)
+
+        assert features is not None
+        assert len(features) > 0
+
+    def test_public_event_feature_extraction(self):
+        """Test PublicEvent feature extraction (security-critical)."""
+        extractor = GitHubFeatureExtractor(filter_bots=False, normalize=False)
+
+        payload = {}  # PublicEvent has minimal payload
+        event = create_test_event(
+            "PublicEvent", "testuser", "owner/repo", payload=payload
+        )
+
+        features = extractor.extract_features(event)
+
+        assert features is not None
+        assert len(features) > 0
+
+    def test_release_event_feature_extraction(self):
+        """Test ReleaseEvent feature extraction."""
+        extractor = GitHubFeatureExtractor(filter_bots=False, normalize=False)
+
+        payload = {
+            "action": "published",
+            "release": {
+                "tag_name": "v1.0.0",
+                "name": "Release v1.0.0",
+                "body": "Release notes here",
+                "draft": False,
+                "prerelease": False,
+            },
+        }
+        event = create_test_event(
+            "ReleaseEvent", "testuser", "owner/repo", payload=payload
+        )
+
+        features = extractor.extract_features(event)
+
+        assert features is not None
+        assert len(features) > 0
+
+    def test_watch_event_feature_extraction(self):
+        """Test WatchEvent feature extraction."""
+        extractor = GitHubFeatureExtractor(filter_bots=False, normalize=False)
+
+        payload = {"action": "started"}
+        event = create_test_event(
+            "WatchEvent", "testuser", "owner/repo", payload=payload
+        )
+
+        features = extractor.extract_features(event)
+
+        assert features is not None
+        assert len(features) > 0
+
+    def test_fork_event_feature_extraction(self):
+        """Test ForkEvent feature extraction."""
+        extractor = GitHubFeatureExtractor(filter_bots=False, normalize=False)
+
+        payload = {"forkee": {"name": "forked-repo", "private": False}}
+        event = create_test_event(
+            "ForkEvent", "testuser", "owner/repo", payload=payload
+        )
+
+        features = extractor.extract_features(event)
+
+        assert features is not None
+        assert len(features) > 0

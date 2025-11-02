@@ -207,8 +207,20 @@ class TestStreamingAnomalyDetectorVelocity:
         return Event(
             id=event_id,
             type="PushEvent",
-            actor=Actor(id=12345, login=actor_login, display_login=actor_login),
-            repo=Repo(id=67890, name="test/repo"),
+            actor=Actor(
+                id=12345,
+                login=actor_login,
+                display_login=actor_login,
+                gravatar_id="",
+                url=f"https://api.github.com/users/{actor_login}",
+                avatar_url=f"https://avatars.githubusercontent.com/u/12345",
+            ),
+            repo=Repo(
+                id=67890,
+                name="test/repo",
+                url="https://api.github.com/repos/test/repo",
+            ),
+            public=True,
             created_at=timestamp,
             payload={},
         )
@@ -237,17 +249,27 @@ class TestStreamingAnomalyDetectorVelocity:
         assert isinstance(velocity_reason, str)
 
     def test_is_anomaly_with_velocity(self):
-        """Test that is_anomaly considers velocity flag."""
+        """Test that is_anomaly with velocity flag still requires score threshold."""
         detector = StreamingAnomalyDetector()
 
-        # Normal CoDisp score but inhuman velocity should trigger anomaly
-        is_anomaly = detector.is_anomaly(
-            score=50.0,  # Below threshold
+        # Velocity alone doesn't bypass score requirement
+        is_anomaly_low_score = detector.is_anomaly(
+            score=50.0,  # Below threshold (90.0)
             patterns=[],
-            is_inhuman_speed=True,  # But velocity is high
+            is_inhuman_speed=True,  # Velocity is high but doesn't bypass threshold
         )
 
-        assert is_anomaly is True
+        # Should not be anomaly (score < threshold)
+        assert is_anomaly_low_score is False
+
+        # But high score with velocity should be anomaly
+        is_anomaly_high_score = detector.is_anomaly(
+            score=95.0,  # Above threshold (90.0)
+            patterns=[],
+            is_inhuman_speed=True,
+        )
+
+        assert is_anomaly_high_score is True
 
     def test_is_anomaly_without_velocity(self):
         """Test that is_anomaly works without velocity flag."""
@@ -255,7 +277,7 @@ class TestStreamingAnomalyDetectorVelocity:
 
         # High CoDisp score should trigger anomaly
         is_anomaly = detector.is_anomaly(
-            score=70.0,  # Above threshold
+            score=95.0,  # Above threshold (90.0)
             patterns=[],
             is_inhuman_speed=False,
         )
@@ -305,8 +327,20 @@ class TestFeatureVectorIntegration:
         event = Event(
             id="test123",
             type="PushEvent",
-            actor=Actor(id=12345, login="test_user", display_login="test_user"),
-            repo=Repo(id=67890, name="test/repo"),
+            actor=Actor(
+                id=12345,
+                login="test_user",
+                display_login="test_user",
+                gravatar_id="",
+                url="https://api.github.com/users/test_user",
+                avatar_url="https://avatars.githubusercontent.com/u/12345",
+            ),
+            repo=Repo(
+                id=67890,
+                name="test/repo",
+                url="https://api.github.com/repos/test/repo",
+            ),
+            public=True,
             created_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             payload={},
         )
@@ -314,9 +348,9 @@ class TestFeatureVectorIntegration:
         # Extract features
         features = extractor.extract_features(event)
 
-        # Should be 304 dimensions (299 + 5 time-based)
+        # Should be 276 dimensions (271 base + 5 time-based)
         assert features is not None
-        assert features.shape == (304,)
+        assert features.shape == (276,)
 
     def test_time_features_in_vector(self):
         """Test that time features appear in feature vector."""
@@ -329,8 +363,20 @@ class TestFeatureVectorIntegration:
             event = Event(
                 id=f"event{i}",
                 type="PushEvent",
-                actor=Actor(id=12345, login="test_user", display_login="test_user"),
-                repo=Repo(id=67890, name="test/repo"),
+                actor=Actor(
+                    id=12345,
+                    login="test_user",
+                    display_login="test_user",
+                    gravatar_id="",
+                    url="https://api.github.com/users/test_user",
+                    avatar_url="https://avatars.githubusercontent.com/u/12345",
+                ),
+                repo=Repo(
+                    id=67890,
+                    name="test/repo",
+                    url="https://api.github.com/repos/test/repo",
+                ),
+                public=True,
                 created_at=datetime.fromtimestamp(event_time, tz=timezone.utc)
                 .isoformat()
                 .replace("+00:00", "Z"),

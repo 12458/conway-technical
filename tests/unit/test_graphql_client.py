@@ -629,3 +629,286 @@ class TestEdgeCases:
 
         assert entropy > 0
         assert entropy < 6
+
+
+@pytest.mark.unit
+class TestWorkflowStatusEnrichment:
+    """Tests for workflow status enrichment."""
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_status_multiple_check_suites(self):
+        """Test workflow status with multiple check suites."""
+        client = GitHubGraphQLClient("ghp_test_token")
+
+        mock_result = {
+            "repository": {
+                "object": {
+                    "checkSuites": {
+                        "nodes": [
+                            {
+                                "conclusion": "SUCCESS",
+                                "status": "COMPLETED",
+                                "checkRuns": {
+                                    "nodes": [
+                                        {"name": "test", "conclusion": "SUCCESS", "status": "COMPLETED"},
+                                        {"name": "lint", "conclusion": "SUCCESS", "status": "COMPLETED"},
+                                    ]
+                                },
+                            },
+                            {
+                                "conclusion": "FAILURE",
+                                "status": "COMPLETED",
+                                "checkRuns": {
+                                    "nodes": [
+                                        {"name": "build", "conclusion": "FAILURE", "status": "COMPLETED"}
+                                    ]
+                                },
+                            },
+                        ]
+                    }
+                }
+            },
+            "rateLimit": {"remaining": 4500, "resetAt": "2025-01-01T12:00:00Z"},
+        }
+
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
+            status = await client.get_workflow_status("owner", "repo", "abc123")
+
+        assert status is not None
+        assert status.repository == "owner/repo"
+        assert status.commit_sha == "abc123"
+        assert status.total_check_suites == 2
+        assert status.successful_suites == 1
+        assert status.failed_suites == 1
+        assert status.overall_conclusion == "FAILURE"  # Failed > 0
+        assert len(status.check_runs) == 3
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_status_pending(self):
+        """Test workflow status with pending check suites."""
+        client = GitHubGraphQLClient("ghp_test_token")
+
+        mock_result = {
+            "repository": {
+                "object": {
+                    "checkSuites": {
+                        "nodes": [
+                            {
+                                "conclusion": None,
+                                "status": "IN_PROGRESS",
+                                "checkRuns": {
+                                    "nodes": [
+                                        {"name": "test", "conclusion": None, "status": "IN_PROGRESS"}
+                                    ]
+                                },
+                            }
+                        ]
+                    }
+                }
+            },
+            "rateLimit": {"remaining": 4500, "resetAt": "2025-01-01T12:00:00Z"},
+        }
+
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
+            status = await client.get_workflow_status("owner", "repo", "abc123")
+
+        assert status is not None
+        assert status.pending_suites == 1
+        assert status.overall_conclusion == "PENDING"
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_status_empty_check_suites(self):
+        """Test workflow status with no check suites."""
+        client = GitHubGraphQLClient("ghp_test_token")
+
+        mock_result = {
+            "repository": {"object": {}},  # No checkSuites key
+            "rateLimit": {"remaining": 4500, "resetAt": "2025-01-01T12:00:00Z"},
+        }
+
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
+            status = await client.get_workflow_status("owner", "repo", "abc123")
+
+        assert status is not None
+        assert status.total_check_suites == 0
+        assert status.successful_suites == 0
+        assert status.failed_suites == 0
+        assert status.overall_conclusion is None
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_status_no_repository(self):
+        """Test workflow status when repository is not found."""
+        client = GitHubGraphQLClient("ghp_test_token")
+
+        mock_result = {"repository": None}
+
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
+            status = await client.get_workflow_status("owner", "nonexistent", "abc123")
+
+        assert status is None
+
+
+@pytest.mark.unit
+class TestCommitVerification:
+    """Tests for commit verification enrichment."""
+
+    @pytest.mark.asyncio
+    async def test_get_commit_verification_signed_commit(self):
+        """Test commit verification for signed commit."""
+        client = GitHubGraphQLClient("ghp_test_token")
+
+        mock_result = {
+            "repository": {
+                "object": {
+                    "signature": {
+                        "isValid": True,
+                        "signer": {"login": "signer-user"},
+                    },
+                    "additions": 100,
+                    "deletions": 50,
+                    "changedFiles": 5,
+                    "message": "Add new feature",
+                    "author": {"name": "Developer", "email": "dev@example.com"},
+                }
+            },
+            "rateLimit": {"remaining": 4500, "resetAt": "2025-01-01T12:00:00Z"},
+        }
+
+        # Mock patch fetching and entropy
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
+            with patch.object(
+                client, "_fetch_commit_patch_rest", new_callable=AsyncMock, return_value="diff content"
+            ):
+                verification = await client.get_commit_verification("owner", "repo", "abc123")
+
+        assert verification is not None
+        assert verification.repository == "owner/repo"
+        assert verification.sha == "abc123"
+        assert verification.is_signed is True
+        assert verification.signature_valid is True
+        assert verification.signer_login == "signer-user"
+        assert verification.additions == 100
+        assert verification.deletions == 50
+        assert verification.changed_files == 5
+        assert verification.commit_entropy is not None  # Entropy was calculated
+
+    @pytest.mark.asyncio
+    async def test_get_commit_verification_unsigned_commit(self):
+        """Test commit verification for unsigned commit."""
+        client = GitHubGraphQLClient("ghp_test_token")
+
+        mock_result = {
+            "repository": {
+                "object": {
+                    "signature": None,  # No signature
+                    "additions": 10,
+                    "deletions": 5,
+                    "changedFiles": 2,
+                    "message": "Fix bug",
+                    "author": {"name": "Developer", "email": "dev@example.com"},
+                }
+            },
+            "rateLimit": {"remaining": 4500, "resetAt": "2025-01-01T12:00:00Z"},
+        }
+
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
+            with patch.object(
+                client, "_fetch_commit_patch_rest", new_callable=AsyncMock, return_value="small diff"
+            ):
+                verification = await client.get_commit_verification("owner", "repo", "def456")
+
+        assert verification is not None
+        assert verification.is_signed is False
+        assert verification.signature_valid is False
+        assert verification.signer_login is None
+
+    @pytest.mark.asyncio
+    async def test_get_commit_verification_high_entropy(self):
+        """Test commit verification detects high entropy (obfuscated code)."""
+        client = GitHubGraphQLClient("ghp_test_token")
+
+        # Create high entropy content (random-looking)
+        high_entropy_patch = "xK9vL2mN8qR5tY7pW3zA1bC4dE6fG0hJ" * 100
+
+        mock_result = {
+            "repository": {
+                "object": {
+                    "signature": None,
+                    "additions": 500,
+                    "deletions": 0,
+                    "changedFiles": 1,
+                    "message": "Update file",
+                    "author": {"name": "Dev", "email": "dev@test.com"},
+                }
+            },
+            "rateLimit": {"remaining": 4500, "resetAt": "2025-01-01T12:00:00Z"},
+        }
+
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
+            with patch.object(
+                client, "_fetch_commit_patch_rest", new_callable=AsyncMock, return_value=high_entropy_patch
+            ):
+                verification = await client.get_commit_verification("owner", "repo", "xyz789")
+
+        assert verification is not None
+        assert verification.commit_entropy is not None
+        # High entropy content should have entropy > 4.0
+        assert verification.commit_entropy > 4.0
+
+    @pytest.mark.asyncio
+    async def test_get_commit_verification_patch_fetch_error(self):
+        """Test commit verification handles patch fetch errors gracefully."""
+        client = GitHubGraphQLClient("ghp_test_token")
+
+        mock_result = {
+            "repository": {
+                "object": {
+                    "signature": None,
+                    "additions": 10,
+                    "deletions": 5,
+                    "changedFiles": 1,
+                    "message": "Update",
+                    "author": {"name": "Dev", "email": "dev@test.com"},
+                }
+            },
+            "rateLimit": {"remaining": 4500, "resetAt": "2025-01-01T12:00:00Z"},
+        }
+
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
+            with patch.object(
+                client, "_fetch_commit_patch_rest", new_callable=AsyncMock, side_effect=Exception("Timeout")
+            ):
+                verification = await client.get_commit_verification("owner", "repo", "error123")
+
+        assert verification is not None
+        assert verification.commit_entropy is None  # Entropy calculation failed gracefully
+
+    @pytest.mark.asyncio
+    async def test_get_commit_verification_no_commit_found(self):
+        """Test commit verification when commit is not found."""
+        client = GitHubGraphQLClient("ghp_test_token")
+
+        mock_result = {"repository": {"object": None}}
+
+        with patch.object(
+            client, "_execute_query", new_callable=AsyncMock, return_value=mock_result
+        ):
+            verification = await client.get_commit_verification("owner", "repo", "notfound")
+
+        assert verification is None
