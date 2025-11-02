@@ -151,7 +151,7 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
                 f"- Organizations: {', '.join(profile.organizations[:5])}"
             )
         if profile.is_site_admin:
-            context_parts.append("- ⚠️ SITE ADMINISTRATOR")
+            context_parts.append("- SITE ADMINISTRATOR")
         if profile.company:
             context_parts.append(f"- Company: {profile.company}")
         context_parts.append("")
@@ -197,9 +197,9 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
                     f"  Failed checks: {', '.join(workflow.failed_check_names[:5])}"
                 )
         elif workflow.all_passed:
-            context_parts.append("  ✓ All checks passed")
+            context_parts.append("  All checks passed")
         elif workflow.pending_suites > 0:
-            context_parts.append(f"  ⏳ {workflow.pending_suites} suites pending")
+            context_parts.append(f"  {workflow.pending_suites} suites pending")
         context_parts.append("")
 
     # Commit verification enrichment
@@ -260,11 +260,11 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
             "    unsigned commits to protected branches, failed CI/CD with security implications,",
             "    unusual permission changes, elevated entropy (6.0-7.0) with other suspicious indicators,",
             "    very large commits (>1000 lines) from untrusted sources",
-            "  * MEDIUM: Unusual patterns from established accounts, policy violations, moderate anomaly scores,",
+            "  * MEDIUM: Unusual patterns from established accounts, policy violations,",
             "    unsigned commits on standard repos, minor workflow failures, inactive accounts with activity,",
-            "    large commits (>500 lines) without other red flags",
+            "    large commits (>500 lines) without other red flags, spammy usernames or repo names",
             "  * LOW: Benign unusual activity, legitimate owner/maintainer maintenance actions,",
-            "    low anomaly scores (<50), administrative tasks by trusted users, normal entropy (<6.0)",
+            "    administrative tasks by trusted users, normal entropy (<6.0)",
             "",
             "- severity_reasoning: 1-2 sentences explaining WHY you chose this severity level",
             "  (reference specific enrichment data: actor profile, repo criticality, patterns detected,",
