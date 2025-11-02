@@ -4,6 +4,16 @@ Frontend Repo: https://github.com/12458/conway-fe
 
 Real-time anomaly detection and alerting system for GitHub public events using RRCF (Robust Random Cut Forest) and AI-powered summarization.
 
+## TLDR
+- What: Real-time anomaly monitoring for GitHub public events with AI summaries.
+- Novelty (OOD): RRCF over vectorized GitHub events + rule-based patterns and bot-aware filtering for higher-precision signals.
+- Flow: Poll REST /events (ETag + backoff) → Detect (RRCF: 50 trees × 256) → Store (Postgres) → Enrich (GitHub GraphQL) → Summarize (GPT-5 mini) → Stream (SSE) → UI.
+- Frontend: Live incident feed (cards + expand for raw JSON). Repo: https://github.com/12458/conway-fe
+- APIs: GET /summary (query summaries), GET /stream (SSE), GET /health, GET /stats.
+- Infra: Python 3.12+, FastAPI, Redis RQ, Postgres. Caching, jittered backoff, idempotent writes.
+- Enrichment: Actor/repo/CI context, commit verification; cached with TTL to reduce GraphQL load.
+- Output: Structured severity (low/medium/high/critical) with Root Cause / Impact / Next Steps.
+
 ### What Was Built
 
 A complete background polling service for GitHub Events API with:
