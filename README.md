@@ -83,15 +83,10 @@ curl http://localhost:8000/stream
 5. **Workers** process jobs and generate AI summaries
 6. **SSE stream** broadcasts summaries to connected clients
 
-### Monitoring
+### RRCF Implementation
+For anomalty detection, I used Robust Random Cut Forest Algorithm for anomaly detection by [Guha et al. (2016)](https://proceedings.mlr.press/v48/guha16.pdf).
 
-Watch the logs for:
-```
-🚨 ANOMALY DETECTED: PushEvent by john-doe on org/repo (score: 85.3, patterns: 2)
-Enqueued summarization job abc123 for event 456789
-✅ Summarization complete for event 456789: Force push to main branch
-Broadcasted summary 1 to SSE clients
-```
+My modified implementation of the [reference implementation](https://klabum.github.io/rrcf/) can be found [here](https://github.com/12458/rrcf).
 
 ---
 
