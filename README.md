@@ -37,8 +37,8 @@ A complete background polling service for GitHub Events API with:
 
 ### Prerequisites
 - Python 3.12+
-- Redis URL (Upstash provided in .env.example)
-- AI API key (Anthropic or OpenAI)
+- Redis URL
+- OpenAI API key
 - GitHub token (optional, for higher rate limits)
 - **GitHub GraphQL token (REQUIRED)** - See configuration section below
 
