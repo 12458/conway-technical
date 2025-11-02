@@ -17,6 +17,7 @@ from github_client.models import Event
 class TestRealGitHubAPI:
     """Integration tests with real GitHub API."""
 
+    @pytest.mark.asyncio
     async def test_fetch_public_events(self):
         """Test fetching public events from real GitHub API."""
         async with GitHubEventsClient() as client:
@@ -34,6 +35,7 @@ class TestRealGitHubAPI:
                 assert event.actor.login is not None
                 assert event.repo.name is not None
 
+    @pytest.mark.asyncio
     async def test_etag_caching_real_api(self):
         """Test ETag caching with real GitHub API."""
         async with GitHubEventsClient() as client:
@@ -55,6 +57,7 @@ class TestRealGitHubAPI:
                 # New events
                 assert response2.etag is not None
 
+    @pytest.mark.asyncio
     async def test_poll_interval_real_api(self):
         """Test poll interval parsing from real GitHub API."""
         async with GitHubEventsClient() as client:
@@ -66,6 +69,7 @@ class TestRealGitHubAPI:
             # Usually 60 seconds
             assert response.poll_interval == 60
 
+    @pytest.mark.asyncio
     async def test_pagination_real_api(self):
         """Test pagination with real GitHub API."""
         async with GitHubEventsClient() as client:
@@ -87,6 +91,7 @@ class TestRealGitHubAPI:
                 # Pages might overlap due to timing, but usually won't
                 assert page1_ids != page2_ids or len(page1_ids.intersection(page2_ids)) < 10
 
+    @pytest.mark.asyncio
     async def test_different_per_page_values(self):
         """Test different per_page parameter values."""
         async with GitHubEventsClient() as client:
@@ -102,6 +107,7 @@ class TestRealGitHubAPI:
             response_large = await client.list_public_events(per_page=30)
             assert len(response_large.events) <= 30
 
+    @pytest.mark.asyncio
     async def test_event_types_from_real_api(self):
         """Test that real API returns various event types."""
         async with GitHubEventsClient() as client:
@@ -125,6 +131,7 @@ class TestRealGitHubAPI:
             # At least one common type should be present
             assert len(event_types.intersection(common_types)) > 0
 
+    @pytest.mark.asyncio
     async def test_response_model_validation_real_data(self):
         """Test that real API data validates against our models."""
         async with GitHubEventsClient() as client:
@@ -151,6 +158,7 @@ class TestRealGitHubAPI:
                 # Payload should be a dict
                 assert isinstance(event.payload, dict)
 
+    @pytest.mark.asyncio
     async def test_client_reuse(self):
         """Test reusing client for multiple requests."""
         async with GitHubEventsClient() as client:
@@ -167,6 +175,7 @@ class TestRealGitHubAPI:
             for response in responses:
                 assert len(response.events) > 0
 
+    @pytest.mark.asyncio
     async def test_max_per_page_limit(self):
         """Test requesting maximum per_page value."""
         async with GitHubEventsClient() as client:
@@ -183,6 +192,7 @@ class TestRealGitHubAPI:
 class TestRealAPIEdgeCases:
     """Edge case integration tests with real API."""
 
+    @pytest.mark.asyncio
     async def test_rapid_polling_respects_poll_interval(self):
         """Test that we can handle rapid polling (respects rate limits)."""
         async with GitHubEventsClient() as client:
@@ -202,6 +212,7 @@ class TestRealAPIEdgeCases:
                 # Small delay to be respectful
                 await asyncio.sleep(2)
 
+    @pytest.mark.asyncio
     async def test_default_per_page(self):
         """Test using default per_page value."""
         async with GitHubEventsClient() as client:

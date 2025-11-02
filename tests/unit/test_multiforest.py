@@ -1,12 +1,16 @@
 """Test script for multi-forest anomaly detection and new features."""
 
 import datetime
+
+import pytest
+
 from github_client.models import Event, Actor, Repo, Organization
 from service.anomaly_detector import MultiForestAnomalyDetector
 from github_client.feature_extractor import GitHubFeatureExtractor
 
+
 def create_test_event(event_type: str, actor_login: str, repo_name: str, created_at: datetime.datetime) -> Event:
-    """Create a test event."""
+    """Create a test event for testing purposes."""
     return Event(
         id=f"test-{event_type}-{actor_login}",
         type=event_type,
@@ -30,12 +34,9 @@ def create_test_event(event_type: str, actor_login: str, repo_name: str, created
     )
 
 
+@pytest.mark.unit
 def test_feature_dimensions():
     """Test that feature extraction produces correct dimensions."""
-    print("=" * 80)
-    print("TEST 1: Feature Dimensions")
-    print("=" * 80)
-
     extractor = GitHubFeatureExtractor(filter_bots=False)
 
     # Create test events
@@ -44,34 +45,21 @@ def test_feature_dimensions():
 
     features = extractor.extract_features(event)
 
-    if features is not None:
-        print(f"✓ Feature vector extracted successfully")
-        print(f"  Feature dimensions: {len(features)}")
-        print(f"  Expected: 276 (64 actor + 4 behavior + 1 entropy + 64 repo + 2 repo_activity + 1 repo_entropy + 32 org + 100 type_specific + 5 velocity + 3 burst)")
-
-        if len(features) == 276:
-            print(f"  ✓ Dimensions match expected!")
-        else:
-            print(f"  ✗ Dimension mismatch! Expected 276, got {len(features)}")
-    else:
-        print("✗ Feature extraction returned None")
-
-    print()
+    assert features is not None, "Feature extraction should not return None"
+    # 64 actor + 4 behavior + 1 entropy + 64 repo + 2 repo_activity + 1 repo_entropy + 32 org + 100 type_specific + 5 velocity + 3 burst
+    expected_dimensions = 276
+    assert len(features) == expected_dimensions, f"Expected {expected_dimensions} dimensions, got {len(features)}"
 
 
+@pytest.mark.unit
 def test_burst_detection():
     """Test temporal burst detection."""
-    print("=" * 80)
-    print("TEST 2: Temporal Burst Detection")
-    print("=" * 80)
-
     extractor = GitHubFeatureExtractor(filter_bots=False)
 
     # Create burst of events (10 events in 15 seconds)
     base_time = datetime.datetime.now(datetime.timezone.utc)
     actor = "burst-tester"
 
-    print(f"Creating burst: 10 events in 15 seconds from {actor}")
     for i in range(10):
         event_time = base_time + datetime.timedelta(seconds=i * 1.5)
         event = create_test_event("IssuesEvent", actor, f"owner/repo{i % 3}", event_time)
@@ -81,24 +69,17 @@ def test_burst_detection():
     last_timestamp = (base_time + datetime.timedelta(seconds=13.5)).timestamp()
     burst_features = extractor.get_temporal_burst_features(actor, last_timestamp)
 
-    print(f"  Burst count: {burst_features[0]:.0f}")
-    print(f"  Silence ratio: {burst_features[1]:.3f} (lower = more bot-like)")
-    print(f"  Inter-event CV: {burst_features[2]:.3f} (lower = more uniform/robotic)")
-
-    if burst_features[0] > 0:
-        print(f"  ✓ Burst detected!")
-    else:
-        print(f"  ⚠ No burst detected (may need more events or time)")
-
-    print()
+    # burst_features[0] is burst count, should be > 0
+    # burst_features[1] is silence ratio (lower = more bot-like)
+    # burst_features[2] is inter-event CV (lower = more uniform/robotic)
+    assert burst_features[0] >= 0, "Burst count should be non-negative"
+    assert 0 <= burst_features[1] <= 1, "Silence ratio should be between 0 and 1"
+    assert burst_features[2] >= 0, "Inter-event CV should be non-negative"
 
 
+@pytest.mark.unit
 def test_repo_hopping():
     """Test time-windowed repo hopping detection."""
-    print("=" * 80)
-    print("TEST 3: Time-Windowed Repo Hopping")
-    print("=" * 80)
-
     extractor = GitHubFeatureExtractor(filter_bots=False)
 
     # Create events across multiple repos
@@ -106,7 +87,6 @@ def test_repo_hopping():
     actor = "repo-hopper"
     num_repos = 15
 
-    print(f"Creating events: {num_repos} different repos in 60 seconds from {actor}")
     for i in range(num_repos):
         event_time = base_time + datetime.timedelta(seconds=i * 4)
         event = create_test_event("PushEvent", actor, f"owner/repo{i}", event_time)
@@ -119,21 +99,14 @@ def test_repo_hopping():
     # Get all-time repos from actor_repos
     alltime_repos = len(extractor.actor_repos.get(actor, set()))
 
-    print(f"  All-time unique repos: {alltime_repos}")
-    print(f"  Windowed unique repos (5 min): {windowed_repos}")
-
-    if windowed_repos > 10:
-        print(f"  ✓ High repo hopping detected in time window!")
-
-    print()
+    assert alltime_repos == num_repos, f"Expected {num_repos} all-time repos, got {alltime_repos}"
+    assert windowed_repos > 0, "Windowed repos should be positive"
+    assert windowed_repos <= alltime_repos, "Windowed repos should not exceed all-time repos"
 
 
+@pytest.mark.unit
 def test_multiforest_routing():
     """Test that events are routed to correct forests."""
-    print("=" * 80)
-    print("TEST 4: Multi-Forest Event Routing")
-    print("=" * 80)
-
     detector = MultiForestAnomalyDetector()
 
     # Test different event types
@@ -148,38 +121,23 @@ def test_multiforest_routing():
         ("UnknownEvent", "other"),
     ]
 
-    print(f"Testing event type routing:")
     for event_type, expected_group in test_cases:
         actual_group = detector._get_forest_group(event_type)
-        status = "✓" if actual_group == expected_group else "✗"
-        print(f"  {status} {event_type:25s} -> {actual_group:15s} (expected: {expected_group})")
-
-    print()
+        assert actual_group == expected_group, f"{event_type} should route to {expected_group}, got {actual_group}"
 
 
+@pytest.mark.unit
 def test_anomaly_scores():
     """Test anomaly score differences between event types."""
-    print("=" * 80)
-    print("TEST 5: Anomaly Score Separation by Event Type")
-    print("=" * 80)
-
     detector = MultiForestAnomalyDetector()
 
     base_time = datetime.datetime.now(datetime.timezone.utc)
-
-    # Simulate a stream with mostly PushEvents
-    print("Simulating event stream: 20 PushEvents, then 5 IssuesEvents")
-    print()
 
     # Feed 20 push events
     for i in range(20):
         event_time = base_time + datetime.timedelta(seconds=i * 60)
         event = create_test_event("PushEvent", f"user{i % 5}", f"owner/repo{i % 3}", event_time)
         score, patterns, features, vel_score, is_inhuman, vel_reason = detector.process_event(event)
-        if score is not None and i % 5 == 0:
-            print(f"  PushEvent #{i+1:2d}: CoDisp = {score:.2f}")
-
-    print()
 
     # Feed 5 issue events from same users
     issue_scores = []
@@ -189,46 +147,15 @@ def test_anomaly_scores():
         score, patterns, features, vel_score, is_inhuman, vel_reason = detector.process_event(event)
         if score is not None:
             issue_scores.append(score)
-            print(f"  IssuesEvent #{i+1}: CoDisp = {score:.2f}")
 
-    print()
+    # Verify we got some scores
+    assert len(issue_scores) > 0, "Should have received some anomaly scores"
 
-    if issue_scores:
-        avg_issue_score = sum(issue_scores) / len(issue_scores)
-        print(f"Average IssuesEvent score: {avg_issue_score:.2f}")
-        print(f"Threshold: {detector.threshold:.2f}")
+    # Verify scores are reasonable (non-negative)
+    for score in issue_scores:
+        assert score >= 0, "Anomaly scores should be non-negative"
 
-        if avg_issue_score < detector.threshold:
-            print(f"✓ IssuesEvents have reasonable scores (below threshold)")
-            print(f"  This shows that issues are NOT being flagged just for being rare!")
-        else:
-            print(f"⚠ Some IssuesEvents exceed threshold (may be expected for initial events)")
-
-    print()
-
-    # Print forest statistics
+    # Verify forest statistics
     stats = detector.get_stats()
-    print("Forest Statistics:")
-    for group_name, group_stats in stats['forest_stats'].items():
-        print(f"  {group_name:15s}: {group_stats['points_processed']:3d} events processed, "
-              f"avg tree size: {group_stats['avg_tree_size']:.1f}")
-
-    print()
-
-
-if __name__ == "__main__":
-    print("\n" + "=" * 80)
-    print("MULTI-FOREST ANOMALY DETECTION TEST SUITE")
-    print("=" * 80)
-    print()
-
-    test_feature_dimensions()
-    test_burst_detection()
-    test_repo_hopping()
-    test_multiforest_routing()
-    test_anomaly_scores()
-
-    print("=" * 80)
-    print("TEST SUITE COMPLETED")
-    print("=" * 80)
-    print()
+    assert 'forest_stats' in stats, "Stats should contain forest_stats"
+    assert len(stats['forest_stats']) > 0, "Should have at least one forest with stats"

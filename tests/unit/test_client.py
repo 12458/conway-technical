@@ -52,12 +52,14 @@ class TestGitHubEventsClientInitialization:
 class TestGitHubEventsClientContextManager:
     """Tests for async context manager."""
 
+    @pytest.mark.asyncio
     async def test_context_manager_enter(self):
         """Test client enters context manager correctly."""
         async with GitHubEventsClient() as client:
             assert client._client is not None
             assert isinstance(client._client, httpx.AsyncClient)
 
+    @pytest.mark.asyncio
     async def test_context_manager_exit(self):
         """Test client exits context manager and closes HTTP client."""
         client = GitHubEventsClient()
@@ -73,6 +75,7 @@ class TestGitHubEventsClientContextManager:
 class TestListPublicEvents:
     """Tests for list_public_events method."""
 
+    @pytest.mark.asyncio
     async def test_list_public_events_success(self, sample_events_list):
         """Test successful list_public_events call."""
         # Mock the API response
@@ -94,6 +97,7 @@ class TestListPublicEvents:
             assert response.etag == "abc123"  # Should strip quotes
             assert response.poll_interval == 60
 
+    @pytest.mark.asyncio
     async def test_list_public_events_with_pagination(self, sample_events_list):
         """Test list_public_events with pagination parameters."""
         respx.get("https://api.github.com/events").mock(
@@ -106,6 +110,7 @@ class TestListPublicEvents:
             # Verify request was made with correct parameters
             assert response is not None
 
+    @pytest.mark.asyncio
     async def test_list_public_events_304_not_modified(self, mock_etag):
         """Test 304 Not Modified response with ETag."""
         respx.get("https://api.github.com/events").mock(
@@ -125,6 +130,7 @@ class TestListPublicEvents:
             assert response.etag == mock_etag
             assert response.poll_interval == 60
 
+    @pytest.mark.asyncio
     async def test_list_public_events_403_forbidden(self):
         """Test 403 Forbidden response raises ForbiddenError."""
         respx.get("https://api.github.com/events").mock(
@@ -138,6 +144,7 @@ class TestListPublicEvents:
             assert exc_info.value.status_code == 403
             assert "forbidden" in exc_info.value.message.lower()
 
+    @pytest.mark.asyncio
     async def test_list_public_events_503_service_unavailable(self):
         """Test 503 Service Unavailable response."""
         respx.get("https://api.github.com/events").mock(
@@ -151,6 +158,7 @@ class TestListPublicEvents:
             assert exc_info.value.status_code == 503
             assert "unavailable" in exc_info.value.message.lower()
 
+    @pytest.mark.asyncio
     async def test_list_public_events_other_http_error(self):
         """Test other HTTP errors raise GitHubAPIError."""
         respx.get("https://api.github.com/events").mock(
@@ -163,6 +171,7 @@ class TestListPublicEvents:
 
             assert exc_info.value.status_code == 500
 
+    @pytest.mark.asyncio
     async def test_list_public_events_invalid_json(self):
         """Test invalid JSON response raises ValidationError."""
         respx.get("https://api.github.com/events").mock(
@@ -178,6 +187,7 @@ class TestListPublicEvents:
 
             assert "validate" in exc_info.value.message.lower()
 
+    @pytest.mark.asyncio
     async def test_list_public_events_network_error(self):
         """Test network error raises GitHubAPIError."""
         respx.get("https://api.github.com/events").mock(
@@ -244,6 +254,7 @@ class TestClientUtilityMethods:
 class TestETagHandling:
     """Tests for ETag caching functionality."""
 
+    @pytest.mark.asyncio
     async def test_etag_sent_in_request_header(self, sample_events_list, mock_etag):
         """Test ETag is sent in If-None-Match header."""
         route = respx.get("https://api.github.com/events").mock(
@@ -259,6 +270,7 @@ class TestETagHandling:
             assert "If-None-Match" in request.headers
             assert mock_etag in request.headers["If-None-Match"]
 
+    @pytest.mark.asyncio
     async def test_etag_with_quotes_in_request(self, sample_events_list):
         """Test ETag is properly quoted in request header."""
         route = respx.get("https://api.github.com/events").mock(
@@ -277,6 +289,7 @@ class TestETagHandling:
 class TestClientClose:
     """Tests for client close method."""
 
+    @pytest.mark.asyncio
     async def test_close_method(self):
         """Test close method closes HTTP client."""
         client = GitHubEventsClient()
@@ -288,6 +301,7 @@ class TestClientClose:
 
         assert client._client is None
 
+    @pytest.mark.asyncio
     async def test_close_method_when_not_initialized(self):
         """Test close method when client is not initialized."""
         client = GitHubEventsClient()
