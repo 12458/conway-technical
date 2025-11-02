@@ -10,7 +10,8 @@ from typing import AsyncGenerator
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
+from sqlalchemy.orm import undefer
 
 from service.anomaly_detector import detector
 from service.database import AnomalySummary, AsyncSessionLocal, init_db
@@ -170,7 +171,19 @@ async def get_summaries(
         List of anomaly summaries
     """
     async with AsyncSessionLocal() as session:
-        query = select(AnomalySummary).order_by(desc(AnomalySummary.created_at))
+        query = (
+            select(AnomalySummary)
+            .order_by(desc(AnomalySummary.created_at))
+            .options(
+                # Eagerly load deferred columns for complete response
+                undefer(AnomalySummary.root_cause),
+                undefer(AnomalySummary.impact),
+                undefer(AnomalySummary.next_steps),
+                undefer(AnomalySummary.suspicious_patterns),
+                undefer(AnomalySummary.raw_event),
+                undefer(AnomalySummary.tags),
+            )
+        )
 
         # Apply filters
         if since:
@@ -265,17 +278,21 @@ async def get_stats():
         Detailed service statistics
     """
     async with AsyncSessionLocal() as session:
-        # Count total summaries
-        result = await session.execute(select(AnomalySummary))
-        total_summaries = len(result.scalars().all())
+        # Count total summaries efficiently using COUNT(*)
+        result = await session.execute(
+            select(func.count()).select_from(AnomalySummary)
+        )
+        total_summaries = result.scalar()
 
-        # Count by severity
+        # Count by severity efficiently using COUNT(*) for each severity
         severity_counts = {}
         for severity in ["low", "medium", "high", "critical"]:
             result = await session.execute(
-                select(AnomalySummary).where(AnomalySummary.severity == severity)
+                select(func.count())
+                .select_from(AnomalySummary)
+                .where(AnomalySummary.severity == severity)
             )
-            severity_counts[severity] = len(result.scalars().all())
+            severity_counts[severity] = result.scalar()
 
     return {
         "poller": poller.get_stats(),
