@@ -105,7 +105,7 @@ class GitHubEvent(Base):
                 "login": self.org_login,
                 "gravatar_id": "",
                 "url": f"https://api.github.com/orgs/{self.org_login}",
-                "avatar_url": f"https://avatars.githubusercontent.com/u/0",
+                "avatar_url": "https://avatars.githubusercontent.com/u/0",
             }
 
         # Build Event dictionary

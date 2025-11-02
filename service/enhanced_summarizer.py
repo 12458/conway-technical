@@ -164,7 +164,7 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
                 "REPOSITORY CONTEXT:",
                 f"- Popularity: {repo.stargazer_count} stars, {repo.fork_count} forks "
                 f"({'CRITICAL' if repo.is_critical else 'Popular' if repo.is_popular else 'Standard'})",
-                f"- Visibility: Public (monitoring public events only)",
+                "- Visibility: Public (monitoring public events only)",
                 f"- Security Score: {repo.security_score}/1",
             ]
         )
