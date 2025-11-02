@@ -231,7 +231,27 @@ graph TD
   - Exponential decay for temporal patterns
   - Z-score normalization using Welford's algorithm
 - CoDisp (collusive displacement) scoring
-- Configurable threshold (default: 60.0)
+- **Adaptive threshold** (default: 98th percentile = top 2% of events flagged)
+- Static threshold fallback (default: 60.0)
+
+### Adaptive Threshold System
+
+The system uses percentile-based adaptive thresholding to maintain a balanced anomaly detection rate:
+
+**How It Works:**
+1. **Rolling Window**: Tracks last 1000 CoDisp scores across all events
+2. **Dynamic Threshold**: Automatically sets threshold to 98th percentile of recent scores
+3. **Warm-Up Period**: Uses static threshold (60.0) for first 1000 events while building score history
+4. **Self-Adjusting**: Adapts to different data regimes (quiet periods, busy periods, distribution shifts)
+5. **Per-Forest Tracking**: Multi-forest mode maintains separate percentiles per event type group
+
+**Benefits:**
+- **Never goes silent**: Always flags top 2% of events (guaranteed alerts)
+- **No alert storms**: Caps maximum anomaly rate at 2% (prevents overwhelming)
+- **Distribution-agnostic**: Works across different event patterns and volumes
+- **Interpretable**: "Top 2%" is clearer than "score > 60"
+
+**Important**: Anomaly scores are used ONLY for detection triggering, NOT for severity assessment. Severity is determined by enrichment data (actor trust, repo criticality, action type, security signals) via AI analysis.
 
 ### Hybrid Detection Pipeline
 
@@ -595,10 +615,16 @@ All settings can be configured via environment variables with the `SERVICE_` pre
 - `SERVICE_MAX_EVENTS_PER_FETCH`: Events per API call (default: 100)
 
 ### Anomaly Detection
-- `SERVICE_ANOMALY_THRESHOLD`: CoDisp threshold (default: 40.0)
+- `SERVICE_ANOMALY_THRESHOLD`: Static CoDisp threshold fallback (default: 60.0)
 - `SERVICE_TREE_SIZE`: RRCF tree size (default: 256)
 - `SERVICE_NUM_TREES`: Number of trees in forest (default: 50)
 - `SERVICE_ENABLE_BOT_FILTERING`: Filter known bots (default: true)
+
+#### Adaptive Threshold
+- `SERVICE_ENABLE_ADAPTIVE_THRESHOLD`: Enable adaptive percentile-based threshold (default: true)
+- `SERVICE_ADAPTIVE_PERCENTILE`: Percentile for threshold (default: 98.0 = top 2%)
+- `SERVICE_ADAPTIVE_WINDOW_SIZE`: Rolling window size for score tracking (default: 1000)
+- `SERVICE_MIN_SAMPLES_FOR_ADAPTIVE`: Warm-up period before adaptive mode activates (default: 1000)
 
 ### GraphQL Enrichment
 - `SERVICE_ENRICHMENT_BATCH_SIZE`: Batch size for queries (default: 10)
@@ -700,9 +726,18 @@ pytest -v
 
 ### Tuning
 
-#### Lower threshold for more anomalies
+#### Adjust anomaly detection rate
 ```bash
 # In .env
+
+# Flag more events (top 5% instead of top 2%)
+SERVICE_ADAPTIVE_PERCENTILE=95.0
+
+# Flag fewer events (top 1% - very selective)
+SERVICE_ADAPTIVE_PERCENTILE=99.0
+
+# Disable adaptive threshold and use static threshold
+SERVICE_ENABLE_ADAPTIVE_THRESHOLD=false
 SERVICE_ANOMALY_THRESHOLD=20.0
 ```
 
@@ -776,6 +811,7 @@ conway/
 - Background polling with ETag caching
 - Exponential backoff (60s → 300s max)
 - RRCF streaming algorithm
+- **Adaptive percentile-based thresholding** (98th percentile, self-adjusting)
 - Proper feature encoding (one-hot hashing, n-grams, exponential decay)
 - 299-dimensional feature vectors
 - Bot filtering reduces noise
