@@ -54,22 +54,9 @@ uv sync
 cp .env.example .env
 ```
 
-#### 3. Test Setup
+#### 3. Run Service
 ```bash
-python test_service.py
-```
-
-You should see:
-```
-✅ AI API key configured
-✅ Redis connection successful
-✅ Database initialized successfully
-✅ All tests passed!
-```
-
-#### 4. Run Service
-```bash
-python run_service.py
+python main.py
 ```
 
 #### 5. Test Endpoints
