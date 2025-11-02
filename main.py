@@ -15,6 +15,7 @@ import os
 import signal
 import sys
 import time
+import uuid
 
 import uvicorn
 
@@ -28,6 +29,38 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def cleanup_stale_workers():
+    """Clean up stale worker registrations from Redis.
+
+    This prevents crashes when restarting the app with workers that
+    didn't properly unregister.
+    """
+    from rq import Worker
+    from service.queue import redis_conn
+
+    try:
+        workers = Worker.all(connection=redis_conn)
+        cleaned = 0
+
+        for worker in workers:
+            # Check if worker is actually alive
+            try:
+                if not worker.is_alive():
+                    logger.info(f"Cleaning up stale worker: {worker.name}")
+                    worker.register_death()
+                    cleaned += 1
+            except Exception as e:
+                logger.warning(f"Error checking worker {worker.name}: {e}")
+
+        if cleaned > 0:
+            logger.info(f"Cleaned up {cleaned} stale worker(s)")
+        else:
+            logger.info("No stale workers found")
+
+    except Exception as e:
+        logger.warning(f"Failed to cleanup stale workers: {e}")
+
+
 def run_worker(worker_num: int):
     """Run a single RQ worker process.
 
@@ -39,17 +72,38 @@ def run_worker(worker_num: int):
 
     from service.queue import anomaly_queue, redis_conn
 
-    logger.info(f"Starting RQ worker #{worker_num}")
+    # Generate unique worker name to avoid conflicts on restart
+    unique_id = str(uuid.uuid4())[:8]
+    worker_name = f"worker-{worker_num}-{unique_id}"
 
+    logger.info(f"Starting RQ worker #{worker_num} with name: {worker_name}")
+
+    worker = None
     try:
         worker = Worker(
             [anomaly_queue],
             connection=redis_conn,
-            name=f"worker-{worker_num}",
+            name=worker_name,
         )
+
+        # Setup signal handlers for graceful shutdown
+        def cleanup_handler(signum, frame):
+            logger.info(f"Worker {worker_name} received signal {signum}, cleaning up...")
+            if worker:
+                worker.register_death()
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, cleanup_handler)
+        signal.signal(signal.SIGINT, cleanup_handler)
+
         worker.work(with_scheduler=True)
     except Exception as e:
-        logger.exception(f"Worker #{worker_num} crashed: {e}")
+        logger.exception(f"Worker #{worker_num} ({worker_name}) crashed: {e}")
+        if worker:
+            try:
+                worker.register_death()
+            except Exception:
+                pass
         sys.exit(1)
 
 
@@ -130,6 +184,9 @@ def main():
 
     if not service_settings.github_token:
         logger.warning("⚠️  GitHub token not set - rate limits will be stricter")
+
+    # Clean up any stale workers from previous runs
+    cleanup_stale_workers()
 
     # Start processes
     processes = []
