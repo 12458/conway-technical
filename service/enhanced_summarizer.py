@@ -70,7 +70,7 @@ async def summarize_enriched_anomaly(enriched_event: EnrichedEvent) -> dict[str,
             result = db_summary.to_dict()
 
         logger.info(
-            f"✅ Enhanced summarization complete for event {event.id}: "
+            f"Enhanced summarization complete for event {event.id}: "
             f"{summary_data['title']} (severity: {summary_data['severity']})"
         )
 
@@ -169,9 +169,9 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
             ]
         )
         if repo.has_security_policy:
-            context_parts.append("  ✓ Security policy present")
+            context_parts.append("  Security policy present")
         if repo.is_archived:
-            context_parts.append("  ⚠️ Repository is ARCHIVED")
+            context_parts.append("  Repository is ARCHIVED")
         if repo.primary_language:
             context_parts.append(f"- Primary Language: {repo.primary_language}")
         if repo.topics:
@@ -190,7 +190,7 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
         )
         if workflow.has_failures:
             context_parts.append(
-                f"  ⚠️ FAILURES DETECTED: {workflow.failed_suites} failed suites"
+                f"  FAILURES DETECTED: {workflow.failed_suites} failed suites"
             )
             if workflow.failed_check_names:
                 context_parts.append(
@@ -208,7 +208,7 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
         context_parts.extend(
             [
                 "COMMIT VERIFICATION:",
-                f"- Signature: {'✓ Signed' if commit.is_verified else '⚠️ NOT SIGNED'}",
+                f"- Signature: {'Signed' if commit.is_verified else 'NOT SIGNED'}",
             ]
         )
         if commit.is_signed and commit.signer_login:
@@ -224,7 +224,7 @@ def _build_enhanced_context(enriched_event: EnrichedEvent) -> str:
         if commit.commit_entropy is not None:
             entropy_warning = ""
             if commit.has_high_entropy:
-                entropy_warning = " ⚠️ SUSPICIOUS - POSSIBLE OBFUSCATED CODE"
+                entropy_warning = " SUSPICIOUS - POSSIBLE OBFUSCATED CODE"
             context_parts.append(
                 f"- Code Entropy: {commit.commit_entropy:.2f} "
                 f"({commit.entropy_level}){entropy_warning}"
