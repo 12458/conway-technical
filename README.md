@@ -97,79 +97,71 @@ Broadcasted summary 1 to SSE clients
 
 ## Architecture
 
-```
-┌─────────────────┐       ┌──────────────────────┐
-│  GitHub Events  │       │  GitHub GraphQL API  │
-│      API        │       │  (Enrichment Data)   │
-└────────┬────────┘       └──────────┬───────────┘
-         │ Poll every 60s            │
-         │ (with ETag caching)       │
-         ▼                           │
-┌─────────────────────────────────┐  │
-│   Background Poller             │  │
-│   • Exponential backoff         │  │
-│   • Rate limit handling         │  │
-│   • Event deduplication         │  │
-└────────┬────────────────────────┘  │
-         │                           │
-         ▼                           │
-┌─────────────────────────────────┐  │
-│   Anomaly Detector (RRCF)       │  │
-│   • Feature extraction          │  │
-│   • 50 trees, size 256          │  │
-│   • CoDisp scoring              │  │
-│   • Rule-based patterns         │  │
-│   • Bot filtering               │  │
-└────────┬────────────────────────┘  │
-         │                           │
-         ▼                           │
-┌─────────────────────────────────┐  │
-│   Database (PostgreSQL)         │  │
-│   • GitHubEvent (all events)    │  │
-│   • AnomalySummary (anomalies)  │  │
-│   • Enrichment cache (4 tables) │  │
-└────────┬────────────────────────┘  │
-         │ Anomalies only            │
-         ▼                           │
-┌─────────────────────────────────┐  │
-│   Redis Queue (RQ)              │  │
-│   • Async job processing        │  │
-│   • Scalable workers            │  │
-└────────┬────────────────────────┘  │
-         │                           │
-         ▼                           │
-┌─────────────────────────────────┐  │
-│   GraphQL Enrichment Service    │◄─┘
-│   • Actor profiles              │
-│   • Repository context          │
-│   • Workflow/CI status          │
-│   • Commit verification         │
-│   • DB caching (TTL-based)      │
-└────────┬────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────┐
-│   AI Summarization Workers      │
-│   • GPT 5 Mini                  │
-│   • Enriched context            │
-│   • Risk-based severity         │
-│   • Structured summaries        │
-└────────┬────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────┐
-│   FastAPI Server                │
-│   • GET /summary (query)        │
-│   • GET /stream (SSE)           │
-│   • GET /health, /stats         │
-└─────────────────────────────────┘
-         │ SSE
-         ▼
-┌─────────────────────────────────┐
-│   Frontend UI                   │
-│   • Real-time incident feed     │
-│   • Filterable cards            │
-└─────────────────────────────────┘
+```mermaid
+graph TD
+    A[GitHub Events API] -->|"Poll every 60s<br/>(with ETag caching)"| C["
+        <strong>Background Poller</strong><br/>
+        • Exponential backoff<br/>
+        • Rate limit handling<br/>
+        • Event deduplication
+    "];
+
+    C --> D["
+        <strong>Anomaly Detector (RRCF)</strong><br/>
+        • Feature extraction<br/>
+        • 50 trees, size 256<br/>
+        • CoDisp scoring<br/>
+        • Rule-based patterns<br/>
+        • Bot filtering
+    "];
+
+    D --> E["
+        <strong>Database (PostgreSQL)</strong><br/>
+        • GitHubEvent (all events)<br/>
+        • AnomalySummary (anomalies)<br/>
+        • Enrichment cache (4 tables)
+    "];
+
+    E -->|"Anomalies only"| F["
+        <strong>Redis Queue (RQ)</strong><br/>
+        • Async job processing<br/>
+        • Scalable workers
+    "];
+
+    F --> G["
+        <strong>GraphQL Enrichment Service</strong><br/>
+        • Actor profiles<br/>
+        • Repository context<br/>
+        • Workflow/CI status<br/>
+        • Commit verification<br/>
+        • DB caching (TTL-based)
+    "];
+
+    B["GitHub GraphQL API<br/>(Enrichment Data)"] --> G;
+
+    G --> H["
+        <strong>AI Summarization Workers</strong><br/>
+        • GPT 5 Mini<br/>
+        • Enriched context<br/>
+        • Risk-based severity<br/>
+        • Structured summaries
+    "];
+
+    H --> I["
+        <strong>FastAPI Server</strong><br/>
+        • GET /summary (query)<br/>
+        • GET /stream (SSE)<br/>
+        • GET /health, /stats
+    "];
+
+    I -->|"SSE"| J["
+        <strong>Frontend UI</strong><br/>
+        • Real-time incident feed<br/>
+        • Filterable cards
+    "];
+
+    %% Styling
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px,font-family:arial;
 ```
 
 ### Architecture Components
