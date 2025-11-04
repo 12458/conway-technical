@@ -6,7 +6,7 @@ Real-time anomaly detection and alerting system for GitHub public events using R
 
 ## Demo
 
-<video src="https://github.com/12458/conway-technical/raw/refs/heads/main/assets/demo/demo.webm" width="320" height="240" controls></video>
+<video src="https://github.com/12458/conway-technical/raw/refs/heads/main/assets/demo/demo.mp4" width="320" height="240" controls></video>
 
 ## TLDR
 - What: Real-time anomaly monitoring for GitHub public events with AI summaries.
