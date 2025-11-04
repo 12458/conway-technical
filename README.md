@@ -6,7 +6,7 @@ Real-time anomaly detection and alerting system for GitHub public events using R
 
 ## Demo
 
-<iframe width="1840" height="1035" src="https://www.youtube.com/embed/M3XMWFSa414" title="GitHub Anomaly Detector" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+[![Demo](https://img.youtube.com/vi/M3XMWFSa414/0.jpg)](https://www.youtube.com/watch?v=M3XMWFSa414)
 
 ## TLDR
 - What: Real-time anomaly monitoring for GitHub public events with AI summaries.
