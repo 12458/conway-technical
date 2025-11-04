@@ -1,6 +1,6 @@
 # GitHub Anomaly Monitoring Service
 
-Frontend Repo: https://github.com/12458/conway-fe
+Frontend Repo: https://github.com/12458/conway-technical-fe
 
 Real-time anomaly detection and alerting system for GitHub public events using RRCF (Robust Random Cut Forest) and AI-powered summarization.
 
