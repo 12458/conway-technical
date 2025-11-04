@@ -4,6 +4,10 @@ Frontend Repo: https://github.com/12458/conway-fe
 
 Real-time anomaly detection and alerting system for GitHub public events using RRCF (Robust Random Cut Forest) and AI-powered summarization.
 
+## Demo
+
+<video src="https://github.com/12458/conway-technical/raw/refs/heads/main/assets/demo/demo.webm" width="320" height="240" controls></video>
+
 ## TLDR
 - What: Real-time anomaly monitoring for GitHub public events with AI summaries.
 - Novelty (OOD): RRCF over vectorized GitHub events + rule-based patterns and bot-aware filtering for higher-precision signals.
