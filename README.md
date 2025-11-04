@@ -10,6 +10,10 @@ Real-time anomaly detection and alerting system for GitHub public events using R
 
 > Click to play on YouTube
 
+<img width="1392" height="1146" alt="image" src="https://github.com/user-attachments/assets/2b8e5930-7862-423a-9279-6d7416369cfd" />
+
+I also found a malicious crypto bot scam user while I was at it.
+
 ## TLDR
 - What: Real-time anomaly monitoring for GitHub public events with AI summaries.
 - Novelty (OOD): RRCF over vectorized GitHub events + rule-based patterns and bot-aware filtering for higher-precision signals.
